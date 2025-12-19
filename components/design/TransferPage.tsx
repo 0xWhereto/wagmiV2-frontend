@@ -8,8 +8,10 @@ import { motion } from 'framer-motion';
 import { useAccount, useSwitchChain } from 'wagmi';
 import { useAllTokenBalances } from '@/hooks/useTokenBalances';
 import { useBridgeTransaction } from '@/hooks/useBridgeTransaction';
+import { useTokenApproval } from '@/hooks/useTokenApproval';
 import { getTokensForChain } from '@/lib/tokens/tokenList';
 import { getTokenLogoBySymbol } from '@/lib/tokens/logos';
+import { getChainConfig } from '@/lib/contracts/config';
 import Image from 'next/image';
 
 // Hub chain (Sonic) - always one side of the transfer
@@ -79,6 +81,19 @@ export function TransferPage() {
   // Bridge transaction hook
   const { bridgeToHub, bridgeFromHub, isLoading: isBridging } = useBridgeTransaction();
 
+  // Approval hook - for bridge TO hub (locking tokens in gateway)
+  const sourceConfig = getChainConfig(fromChain.id);
+  const spenderAddress = direction === 'toHub' 
+    ? ((sourceConfig?.contracts as Record<string, string>)?.gatewayVault as `0x${string}` | undefined)
+    : undefined;
+  
+  const approval = useTokenApproval({
+    tokenSymbol: selectedToken.symbol,
+    amount: amount,
+    chainId: fromChain.id,
+    spenderAddress: spenderAddress,
+  });
+
   const handleSwapDirection = () => {
     setDirection(direction === 'toHub' ? 'fromHub' : 'toHub');
   };
@@ -117,19 +132,34 @@ export function TransferPage() {
     }
   };
 
-  const getButtonText = () => {
-    if (!isConnected) return 'Connect Wallet';
-    if (!amount || parseFloat(amount) === 0) return 'Enter amount';
+  // Check if native token (no approval needed)
+  const isNativeToken = selectedToken.symbol === 'ETH' || selectedToken.symbol === 'S';
+
+  const getButtonState = () => {
+    if (!isConnected) return { text: 'Connect Wallet', disabled: true, action: 'none' };
+    if (!amount || parseFloat(amount) === 0) return { text: 'Enter amount', disabled: true, action: 'none' };
 
     const targetChainId = direction === 'toHub' ? selectedChain.id : HUB_CHAIN.id;
     const targetChainName = direction === 'toHub' ? selectedChain.name : 'Sonic';
 
-    if (chain?.id !== targetChainId) return `Switch to ${targetChainName}`;
-    if (isBridging) return 'Transferring...';
-    return 'Transfer';
+    if (chain?.id !== targetChainId) return { text: `Switch to ${targetChainName}`, disabled: false, action: 'switch' };
+    
+    // For bridge to hub (non-native tokens), check allowance
+    if (direction === 'toHub' && !isNativeToken) {
+      if (approval.isCheckingAllowance) {
+        return { text: 'Checking allowance...', disabled: true, action: 'none' };
+      }
+      if (approval.needsApproval) {
+        return { text: `Approve ${selectedToken.symbol}`, disabled: false, action: 'approve' };
+      }
+    }
+    
+    if (approval.isApproving) return { text: 'Approving...', disabled: true, action: 'none' };
+    if (isBridging) return { text: 'Transferring...', disabled: true, action: 'none' };
+    return { text: 'Transfer', disabled: false, action: 'transfer' };
   };
 
-  const isButtonDisabled = !isConnected || !amount || parseFloat(amount) === 0 || isBridging;
+  const buttonState = getButtonState();
 
   const usdValue = useMemo(() => {
     const price = getTokenPrice(selectedToken.symbol);
@@ -296,17 +326,39 @@ export function TransferPage() {
                     <span className="text-zinc-500">Bridge fee</span>
                     <span className="text-zinc-300">~$0.50</span>
                   </div>
+                  {/* Allowance indicator for bridge to hub */}
+                  {direction === 'toHub' && !isNativeToken && (
+                    <div className="flex items-center justify-between text-sm pt-2 border-t border-zinc-700/50">
+                      <span className="text-zinc-500">Allowance</span>
+                      {approval.isCheckingAllowance ? (
+                        <span className="text-zinc-400">Checking...</span>
+                      ) : approval.needsApproval ? (
+                        <span className="text-amber-400">Approval needed</span>
+                      ) : (
+                        <span className="text-emerald-400">✓ Approved</span>
+                      )}
+                    </div>
+                  )}
                 </motion.div>
               )}
 
               <motion.button
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.99 }}
-                disabled={isButtonDisabled}
-                onClick={handleTransfer}
+                disabled={buttonState.disabled}
+                onClick={() => {
+                  if (buttonState.action === 'approve') {
+                    approval.approve();
+                  } else if (buttonState.action === 'switch') {
+                    const targetChainId = direction === 'toHub' ? selectedChain.id : HUB_CHAIN.id;
+                    switchChain?.({ chainId: targetChainId });
+                  } else if (buttonState.action === 'transfer') {
+                    handleTransfer();
+                  }
+                }}
                 className="w-full mt-6 py-4 bg-zinc-100 hover:bg-white text-zinc-950 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-lg"
               >
-                {getButtonText()}
+                {buttonState.text}
               </motion.button>
             </div>
           </div>
