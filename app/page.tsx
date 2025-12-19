@@ -10,11 +10,12 @@ import {
   GMIPage, 
   DashboardPage,
   TransferPage,
+  USDWPage,
   DustTransition
 } from '@/components/design';
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<'swap' | 'liquidity' | 'dashboard' | 'gmi' | 'transfer'>('swap');
+  const [currentPage, setCurrentPage] = useState<'swap' | 'liquidity' | 'dashboard' | 'gmi' | 'transfer' | 'usdw'>('swap');
   const [showDust, setShowDust] = useState(false);
   const isFirstRender = useRef(true);
   
@@ -97,6 +98,8 @@ export default function App() {
               <DashboardPage />
             ) : currentPage === 'transfer' ? (
               <TransferPage />
+            ) : currentPage === 'usdw' ? (
+              <USDWPage />
             ) : (
               <GMIPage />
             )}

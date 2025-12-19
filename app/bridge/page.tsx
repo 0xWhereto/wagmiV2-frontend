@@ -125,10 +125,15 @@ function TokenSelector({
     }))
     .sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance));
 
+  const handleToggle = () => {
+    setIsOpen(prev => !prev);
+  };
+
   return (
-    <div className="relative">
+    <div className="relative z-20">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        type="button"
+        onClick={handleToggle}
         className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all hover:bg-white/5"
         style={{ background: "transparent" }}
       >

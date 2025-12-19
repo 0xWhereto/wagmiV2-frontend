@@ -23,8 +23,8 @@ function Portal({ children }: { children: React.ReactNode }) {
 }
 
 interface HeaderProps {
-  onNavigate: (page: 'swap' | 'liquidity' | 'dashboard' | 'gmi' | 'transfer') => void;
-  currentPage: 'swap' | 'liquidity' | 'dashboard' | 'gmi' | 'transfer';
+  onNavigate: (page: 'swap' | 'liquidity' | 'dashboard' | 'gmi' | 'transfer' | 'usdw') => void;
+  currentPage: 'swap' | 'liquidity' | 'dashboard' | 'gmi' | 'transfer' | 'usdw';
 }
 
 // Toggle Switch Component
@@ -153,6 +153,12 @@ export function Header({ onNavigate, currentPage }: HeaderProps) {
               </AnimatePresence>
             </div>
 
+            <button
+              className={`transition-colors ${currentPage === 'usdw' ? 'text-zinc-100' : 'text-zinc-400 hover:text-zinc-100'}`}
+              onClick={() => onNavigate('usdw')}
+            >
+              MagicPool
+            </button>
             <button
               className={`transition-colors ${currentPage === 'gmi' ? 'text-zinc-100' : 'text-zinc-400 hover:text-zinc-100'}`}
               onClick={() => onNavigate('gmi')}

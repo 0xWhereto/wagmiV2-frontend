@@ -5,11 +5,12 @@ import { motion } from 'framer-motion';
 import { StrategiesTab } from './liquidity/StrategiesTab';
 import { LeverageTab } from './liquidity/LeverageTab';
 import { V3PoolsTab } from './liquidity/V3PoolsTab';
+import { VaultsTab } from './liquidity/VaultsTab';
 
-type Tab = 'Strategies' | 'Leverage' | 'V3 Pools';
+type Tab = 'Vaults' | 'Strategies' | 'Leverage' | 'V3 Pools';
 
 export function LiquidityPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('Strategies');
+  const [activeTab, setActiveTab] = useState<Tab>('Vaults');
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -30,6 +31,22 @@ export function LiquidityPage() {
         animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
         transition={{ duration: 0.3, delay: 0.15 }}
       >
+        <button
+          onClick={() => setActiveTab('Vaults')}
+          className={`pb-4 transition-colors relative ${
+            activeTab === 'Vaults'
+              ? 'text-zinc-100'
+              : 'text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          Vaults
+          {activeTab === 'Vaults' && (
+            <motion.div
+              layoutId="liquidityActiveTab"
+              className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-100"
+            />
+          )}
+        </button>
         <button
           onClick={() => setActiveTab('Strategies')}
           className={`pb-4 transition-colors relative ${
@@ -87,6 +104,7 @@ export function LiquidityPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
+        {activeTab === 'Vaults' && <VaultsTab />}
         {activeTab === 'Strategies' && <StrategiesTab />}
         {activeTab === 'Leverage' && <LeverageTab />}
         {activeTab === 'V3 Pools' && <V3PoolsTab />}
