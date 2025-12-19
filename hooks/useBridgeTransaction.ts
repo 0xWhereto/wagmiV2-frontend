@@ -266,6 +266,33 @@ export function useBridgeTransaction() {
         throw new Error(`Token ${tokenSymbol} is not yet linked to the bridge on this chain. Please contact the admin to link this token.`);
       }
 
+      // Verify allowance before proceeding (safeguard against race conditions)
+      toast.update(toastId, "pending", "Checking Allowance", undefined, "Verifying token approval...");
+      const erc20Abi = [
+        { name: "allowance", type: "function", stateMutability: "view", 
+          inputs: [{ name: "owner", type: "address" }, { name: "spender", type: "address" }],
+          outputs: [{ name: "", type: "uint256" }] },
+      ] as const;
+      
+      try {
+        const allowance = await publicClient?.readContract({
+          address: tokenAddress,
+          abi: erc20Abi,
+          functionName: "allowance",
+          args: [receiverAddress, gatewayAddress],
+        });
+        
+        if (!allowance || allowance < amountWei) {
+          throw new Error(`Insufficient allowance. Please approve ${tokenSymbol} first. Current allowance: ${allowance?.toString() || "0"}`);
+        }
+      } catch (e: any) {
+        if (e.message?.includes("Insufficient allowance")) {
+          throw e;
+        }
+        console.warn("Allowance check failed:", e);
+        // Continue anyway if check fails - the transaction will fail with a clear error
+      }
+
       toast.update(toastId, "pending", "Getting Quote", undefined, "Calculating bridge fee...");
 
       // Get quote for LayerZero fee

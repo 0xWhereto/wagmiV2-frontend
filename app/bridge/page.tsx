@@ -316,6 +316,10 @@ export default function BridgePage() {
     if (balance && parseFloat(amount) > parseFloat(balance.balanceRaw || "0")) {
       return { text: "Insufficient balance", disabled: true };
     }
+    // Show loading state while checking allowance (prevents race condition)
+    if (approval.isCheckingAllowance && bridgeToHub) {
+      return { text: "Checking allowance...", disabled: true };
+    }
     if (approval.needsApproval) return { text: `Approve ${selectedToken}`, disabled: false, action: "approve" };
     if (approval.isApproving || isBridging) return { text: "Processing...", disabled: true };
     return { text: "Bridge", disabled: false, action: "bridge" };
