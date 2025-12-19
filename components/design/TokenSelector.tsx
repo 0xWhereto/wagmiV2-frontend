@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
@@ -23,6 +24,24 @@ interface TokenSelectorProps {
 
 export function TokenSelector({ tokens, selectedToken, onSelect, onClose }: TokenSelectorProps) {
   const [search, setSearch] = useState('');
+  const [mounted, setMounted] = useState(false);
+  const portalRef = useRef<HTMLDivElement | null>(null);
+
+  // Create portal container on mount
+  useEffect(() => {
+    // Create a div for the portal
+    const portalDiv = document.createElement('div');
+    portalDiv.id = 'token-selector-portal';
+    document.body.appendChild(portalDiv);
+    portalRef.current = portalDiv;
+    setMounted(true);
+
+    return () => {
+      if (portalRef.current && document.body.contains(portalRef.current)) {
+        document.body.removeChild(portalRef.current);
+      }
+    };
+  }, []);
 
   const filteredTokens = tokens.filter(
     (token) =>
@@ -30,7 +49,14 @@ export function TokenSelector({ tokens, selectedToken, onSelect, onClose }: Toke
       token.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  return (
+  const handleTokenClick = (token: Token) => {
+    onSelect(token);
+  };
+
+  // Don't render until mounted (for SSR)
+  if (!mounted || !portalRef.current) return null;
+
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -52,17 +78,10 @@ export function TokenSelector({ tokens, selectedToken, onSelect, onClose }: Toke
             <h3 style={{ color: '#fafafa' }}>Select a token</h3>
             <button
               type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onClose();
-              }}
-              className="p-1 rounded-lg transition-colors"
-              style={{ backgroundColor: 'transparent' }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#27272a'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              onClick={onClose}
+              className="p-1 rounded-lg transition-colors hover:bg-zinc-700"
             >
-              <X className="w-5 h-5" style={{ color: '#a1a1aa' }} />
+              <X className="w-5 h-5 text-zinc-400" />
             </button>
           </div>
 
@@ -89,15 +108,8 @@ export function TokenSelector({ tokens, selectedToken, onSelect, onClose }: Toke
             <button
               type="button"
               key={token.symbol}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onSelect(token);
-              }}
-              className="w-full p-4 flex items-center justify-between transition-colors group cursor-pointer"
-              style={{ backgroundColor: 'transparent' }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(39, 39, 42, 0.5)'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              onClick={() => handleTokenClick(token)}
+              className="w-full p-4 flex items-center justify-between transition-colors group cursor-pointer hover:bg-zinc-800/50"
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-zinc-400 to-zinc-500">
@@ -125,7 +137,8 @@ export function TokenSelector({ tokens, selectedToken, onSelect, onClose }: Toke
           )}
         </div>
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    portalRef.current
   );
 }
 
