@@ -308,20 +308,30 @@ export default function BridgePage() {
   const receiveAmount = parseFloat(amount) || 0;
   const receiveToken = bridgeToHub ? "s" + selectedToken : selectedToken.replace(/^s/, "");
 
-  // Button state
+  // Button state - checks allowance reactively as user types
   const getButtonState = () => {
     if (!isConnected) return { text: "Connect Wallet", disabled: true };
     if (!amount || parseFloat(amount) <= 0) return { text: "Enter amount", disabled: true };
+    
     const balance = sourceBalances[selectedToken];
     if (balance && parseFloat(amount) > parseFloat(balance.balanceRaw || "0")) {
       return { text: "Insufficient balance", disabled: true };
     }
-    // Show loading state while checking allowance (prevents race condition)
-    if (approval.isCheckingAllowance && bridgeToHub) {
-      return { text: "Checking allowance...", disabled: true };
+    
+    // For bridge to hub (non-native tokens), check allowance
+    if (bridgeToHub && selectedToken !== "ETH" && selectedToken !== "S") {
+      // Show loading state while checking allowance (prevents race condition)
+      if (approval.isCheckingAllowance) {
+        return { text: "Checking allowance...", disabled: true };
+      }
+      // If amount exceeds allowance, show Approve button
+      if (approval.needsApproval) {
+        return { text: `Approve ${selectedToken}`, disabled: false, action: "approve" };
+      }
     }
-    if (approval.needsApproval) return { text: `Approve ${selectedToken}`, disabled: false, action: "approve" };
-    if (approval.isApproving || isBridging) return { text: "Processing...", disabled: true };
+    
+    if (approval.isApproving) return { text: "Approving...", disabled: true };
+    if (isBridging) return { text: "Bridging...", disabled: true };
     return { text: "Bridge", disabled: false, action: "bridge" };
   };
 
@@ -465,10 +475,25 @@ export default function BridgePage() {
               <span className="text-gray-500">Protocol Fee</span>
               <span style={{ color: "#10B981" }}>Free (1:1)</span>
             </div>
-            <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center justify-between text-sm mb-2">
               <span className="text-gray-500">Estimated Time</span>
               <span className="text-white">~2 minutes</span>
             </div>
+            {/* Allowance indicator for bridge to hub */}
+            {bridgeToHub && selectedToken !== "ETH" && selectedToken !== "S" && amount && parseFloat(amount) > 0 && (
+              <div className="flex items-center justify-between text-sm pt-2 border-t border-gray-800">
+                <span className="text-gray-500">Allowance</span>
+                {approval.isCheckingAllowance ? (
+                  <span className="text-gray-400">Checking...</span>
+                ) : approval.needsApproval ? (
+                  <span className="text-amber-400">
+                    Approval needed
+                  </span>
+                ) : (
+                  <span style={{ color: "#10B981" }}>✓ Approved</span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Bridge Button */}
