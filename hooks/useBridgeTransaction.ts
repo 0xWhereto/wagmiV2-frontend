@@ -100,15 +100,14 @@ const gatewayVaultAbi = [
   },
 ] as const;
 
-// SyntheticTokenHub ABI for withdraw (bridge from Sonic)
+// SyntheticTokenHub ABI for bridgeTokens (bridge from Sonic to other chains)
 const syntheticTokenHubAbi = [
   {
-    name: "withdraw",
+    name: "bridgeTokens",
     type: "function",
     stateMutability: "payable",
     inputs: [
-      { name: "_recepient", type: "address" },
-      { name: "_dstEid", type: "uint32" },
+      { name: "_recipient", type: "address" },
       {
         name: "_assets",
         type: "tuple[]",
@@ -117,6 +116,7 @@ const syntheticTokenHubAbi = [
           { name: "tokenAmount", type: "uint256" },
         ],
       },
+      { name: "_dstEid", type: "uint32" },
       { name: "_options", type: "bytes" },
     ],
     outputs: [
@@ -139,12 +139,11 @@ const syntheticTokenHubAbi = [
     ],
   },
   {
-    name: "quoteWithdraw",
+    name: "quoteBridgeTokens",
     type: "function",
     stateMutability: "view",
     inputs: [
-      { name: "_recepient", type: "address" },
-      { name: "_dstEid", type: "uint32" },
+      { name: "_recipient", type: "address" },
       {
         name: "_assets",
         type: "tuple[]",
@@ -153,9 +152,21 @@ const syntheticTokenHubAbi = [
           { name: "tokenAmount", type: "uint256" },
         ],
       },
+      { name: "_dstEid", type: "uint32" },
       { name: "_options", type: "bytes" },
     ],
-    outputs: [{ name: "nativeFee", type: "uint256" }],
+    outputs: [
+      { name: "nativeFee", type: "uint256" },
+      {
+        name: "assetsRemote",
+        type: "tuple[]",
+        components: [
+          { name: "tokenAddress", type: "address" },
+          { name: "tokenAmount", type: "uint256" },
+        ],
+      },
+      { name: "penalties", type: "uint256[]" },
+    ],
   },
 ] as const;
 
@@ -357,31 +368,34 @@ export function useBridgeTransaction() {
       toast.update(toastId, "pending", "Getting Quote", undefined, "Calculating bridge fee...");
 
       // Get quote for LayerZero fee
+      // Note: quoteBridgeTokens takes (recipient, assets, dstEid, options)
       let nativeFee: bigint;
       try {
         const quoteResult = await publicClient?.readContract({
           address: hubAddress,
           abi: syntheticTokenHubAbi,
-          functionName: "quoteWithdraw",
-          args: [receiverAddress, destEid, assets, lzOptions],
+          functionName: "quoteBridgeTokens",
+          args: [receiverAddress, assets, destEid, lzOptions],
         });
-        nativeFee = (quoteResult as bigint) || BigInt(0);
+        // quoteBridgeTokens returns [nativeFee, assetsRemote, penalties]
+        nativeFee = (quoteResult as [bigint, unknown, unknown])?.[0] || BigInt(0);
         // Add 10% buffer for safety
         nativeFee = (nativeFee * BigInt(110)) / BigInt(100);
       } catch (e) {
         console.warn("Quote failed, using default fee:", e);
-        // Use a default fee if quote fails (0.001 S)
-        nativeFee = parseUnits("0.001", 18);
+        // Use a default fee if quote fails (0.5 S for Sonic)
+        nativeFee = parseUnits("0.5", 18);
       }
 
       toast.update(toastId, "pending", "Bridge Transaction", undefined, `Bridging ${amount} ${tokenSymbol}...`);
 
-      // Execute withdraw from synthetic token hub
+      // Execute bridgeTokens from synthetic token hub
+      // Note: bridgeTokens takes (recipient, assets, dstEid, options)
       const hash = await writeContractAsync({
         address: hubAddress,
         abi: syntheticTokenHubAbi,
-        functionName: "withdraw",
-        args: [receiverAddress, destEid, assets, lzOptions],
+        functionName: "bridgeTokens",
+        args: [receiverAddress, assets, destEid, lzOptions],
         value: nativeFee,
         chainId: 146,
       });
