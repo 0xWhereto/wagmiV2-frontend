@@ -70,19 +70,34 @@ export function TransferPage() {
     tokensWithBalances[0] || { symbol: 'WETH', name: 'Wrapped Ether', balance: '0.00', decimals: 18 }
   );
 
-  // Update selected token balance when balances change (but don't change the token itself)
+  // Reset selected token when source chain changes (direction or selectedChain)
+  useEffect(() => {
+    if (tokensWithBalances.length > 0) {
+      // Check if current token exists on the new chain
+      const existsOnNewChain = tokensWithBalances.find(t => t.symbol === selectedToken.symbol);
+      if (!existsOnNewChain) {
+        // Token doesn't exist on new chain, select the first available token
+        console.log('Chain changed, resetting token to:', tokensWithBalances[0].symbol);
+        setSelectedToken(tokensWithBalances[0]);
+      } else {
+        // Token exists, just update the balance
+        setSelectedToken(existsOnNewChain);
+      }
+    }
+  }, [fromChain.id]); // Only trigger when source chain changes
+  
+  // Update selected token balance when balances change
   useEffect(() => {
     if (tokensWithBalances.length > 0 && selectedToken) {
       const updated = tokensWithBalances.find(t => t.symbol === selectedToken.symbol);
       if (updated && updated.balance !== selectedToken.balance) {
-        // Only update the balance, not switch the token
         setSelectedToken(prev => ({
           ...prev,
           balance: updated.balance,
         }));
       }
     }
-  }, [tokensWithBalances, selectedToken.symbol, selectedToken.balance]);
+  }, [balances]); // Only trigger when balances change, not tokensWithBalances
   
   // Handle token change from dropdown
   const handleTokenChange = (token: TokenWithBalance) => {
