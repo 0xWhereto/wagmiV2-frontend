@@ -125,87 +125,110 @@ function TokenSelector({
     }))
     .sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance));
 
-  const handleToggle = () => {
-    setIsOpen(prev => !prev);
+  const handleTokenSelect = (symbol: string) => {
+    onChange(symbol);
+    setIsOpen(false);
+    setSearch("");
   };
 
   return (
-    <div className="relative z-20">
-      <button
-        type="button"
-        onClick={handleToggle}
-        className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all hover:bg-white/5"
-        style={{ background: "transparent" }}
-      >
-        <div className="w-5 h-5 rounded-full overflow-hidden bg-gray-700">
-          <Image src={getTokenLogoBySymbol(selected)} alt={selected} width={20} height={20} className="w-full h-full object-cover" />
-        </div>
-        <span className="font-medium text-sm text-white">{selected}</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
+    <>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all hover:bg-white/5"
+          style={{ background: "transparent" }}
+        >
+          <div className="w-5 h-5 rounded-full overflow-hidden bg-gray-700">
+            <Image src={getTokenLogoBySymbol(selected)} alt={selected} width={20} height={20} className="w-full h-full object-cover" />
+          </div>
+          <span className="font-medium text-sm text-white">{selected}</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+      </div>
 
+      {/* Portal-style modal - outside the relative container */}
       <AnimatePresence>
         {isOpen && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => { setIsOpen(false); setSearch(""); }} />
+          <div className="fixed inset-0 z-[9999]">
+            {/* Backdrop */}
+            <div 
+              className="absolute inset-0 bg-black/50" 
+              onClick={() => { setIsOpen(false); setSearch(""); }} 
+            />
+            
+            {/* Dropdown Modal */}
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="absolute top-full left-0 mt-2 w-64 rounded-lg overflow-hidden z-50"
-              style={{ background: "#1a1a1a" }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-72 rounded-xl overflow-hidden shadow-2xl"
+              style={{ background: "#18181b" }}
             >
-              {/* Search Input */}
-              <div className="p-3 border-b border-zinc-900">
+              {/* Header */}
+              <div className="p-4 border-b border-zinc-800">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-white font-medium">Select a token</h3>
+                  <button
+                    type="button"
+                    onClick={() => { setIsOpen(false); setSearch(""); }}
+                    className="p-1 hover:bg-zinc-700 rounded transition-colors"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search token..."
+                  placeholder="Search by name or symbol"
                   autoFocus
-                  className="w-full bg-transparent text-white text-sm placeholder-gray-500 focus:outline-none"
+                  className="w-full px-3 py-2 bg-zinc-900 text-white text-sm rounded-lg placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-zinc-600"
                 />
               </div>
               
               {/* Token List */}
               <div 
-                className="max-h-56 overflow-y-auto"
+                className="max-h-64 overflow-y-auto"
                 style={{
                   scrollbarWidth: "thin",
                   scrollbarColor: "#374151 transparent",
                 }}
               >
                 {availableTokens.length === 0 ? (
-                  <div className="px-4 py-3 text-sm text-gray-500">No tokens found</div>
+                  <div className="px-4 py-6 text-sm text-gray-500 text-center">No tokens found</div>
                 ) : (
                   availableTokens.map((token) => (
                     <button
+                      type="button"
                       key={token.symbol}
-                      onClick={() => {
-                        onChange(token.symbol);
-                        setIsOpen(false);
-                        setSearch("");
-                      }}
-                      className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/5 transition-all"
+                      onClick={() => handleTokenSelect(token.symbol)}
+                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800 transition-colors cursor-pointer"
                     >
-                      <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full overflow-hidden bg-gray-700">
-                          <Image src={getTokenLogoBySymbol(token.symbol)} alt={token.symbol} width={20} height={20} className="w-full h-full object-cover" />
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-700">
+                          <Image src={getTokenLogoBySymbol(token.symbol)} alt={token.symbol} width={32} height={32} className="w-full h-full object-cover" />
                         </div>
-                        <span className="text-sm text-white">{token.symbol}</span>
+                        <div className="text-left">
+                          <div className="text-sm font-medium text-white">{token.symbol}</div>
+                          <div className="text-xs text-gray-500">{token.name}</div>
+                        </div>
                       </div>
-                      <span className="text-xs text-gray-500">{token.balance}</span>
+                      <span className="text-sm text-gray-400">{token.balance}</span>
                     </button>
                   ))
                 )}
               </div>
             </motion.div>
-          </>
+          </div>
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 }
 
