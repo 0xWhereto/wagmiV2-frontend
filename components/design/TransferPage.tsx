@@ -70,13 +70,25 @@ export function TransferPage() {
     tokensWithBalances[0] || { symbol: 'WETH', name: 'Wrapped Ether', balance: '0.00', decimals: 18 }
   );
 
-  // Update selected token when chain changes
+  // Update selected token balance when balances change (but don't change the token itself)
   useEffect(() => {
-    if (tokensWithBalances.length > 0) {
-      const current = tokensWithBalances.find(t => t.symbol === selectedToken.symbol);
-      setSelectedToken(current || tokensWithBalances[0]);
+    if (tokensWithBalances.length > 0 && selectedToken) {
+      const updated = tokensWithBalances.find(t => t.symbol === selectedToken.symbol);
+      if (updated && updated.balance !== selectedToken.balance) {
+        // Only update the balance, not switch the token
+        setSelectedToken(prev => ({
+          ...prev,
+          balance: updated.balance,
+        }));
+      }
     }
-  }, [tokensWithBalances]);
+  }, [tokensWithBalances, selectedToken.symbol, selectedToken.balance]);
+  
+  // Handle token change from dropdown
+  const handleTokenChange = (token: TokenWithBalance) => {
+    console.log('Token changed to:', token.symbol);
+    setSelectedToken(token);
+  };
 
   // Bridge transaction hook
   const { bridgeToHub, bridgeFromHub, isLoading: isBridging } = useBridgeTransaction();
@@ -253,7 +265,7 @@ export function TransferPage() {
                   amount={amount}
                   onAmountChange={handleAmountChange}
                   tokens={tokensWithBalances}
-                  onTokenChange={setSelectedToken}
+                  onTokenChange={handleTokenChange}
                   usdValue={usdValue}
                 />
 
