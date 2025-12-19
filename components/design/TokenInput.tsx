@@ -52,6 +52,7 @@ export function TokenInput({
 
         <div className="flex items-center gap-3 pb-3 border-b border-zinc-700">
           <button
+            type="button"
             onClick={() => setIsSelectingToken(true)}
             className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors group"
           >
@@ -84,6 +85,7 @@ export function TokenInput({
             />
             {!readOnly && (
               <button
+                type="button"
                 onClick={handleMaxClick}
                 className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300 transition-colors"
               >

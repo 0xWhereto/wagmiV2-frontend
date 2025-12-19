@@ -51,7 +51,12 @@ export function TokenSelector({ tokens, selectedToken, onSelect, onClose }: Toke
           <div className="flex items-center justify-between mb-4">
             <h3 style={{ color: '#fafafa' }}>Select a token</h3>
             <button
-              onClick={onClose}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onClose();
+              }}
               className="p-1 rounded-lg transition-colors"
               style={{ backgroundColor: 'transparent' }}
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#27272a'}
@@ -82,9 +87,14 @@ export function TokenSelector({ tokens, selectedToken, onSelect, onClose }: Toke
         <div className="max-h-96 overflow-y-auto">
           {filteredTokens.map((token) => (
             <button
+              type="button"
               key={token.symbol}
-              onClick={() => onSelect(token)}
-              className="w-full p-4 flex items-center justify-between transition-colors group"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onSelect(token);
+              }}
+              className="w-full p-4 flex items-center justify-between transition-colors group cursor-pointer"
               style={{ backgroundColor: 'transparent' }}
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(39, 39, 42, 0.5)'}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
