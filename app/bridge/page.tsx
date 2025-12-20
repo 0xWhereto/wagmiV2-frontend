@@ -280,7 +280,7 @@ export default function BridgePage() {
   }, [sourceChainId, selectedToken]);
 
   // Balances
-  const { balances: sourceBalances } = useAllTokenBalances(sourceChainId);
+  const { balances: sourceBalances, refetch: refetchBalances } = useAllTokenBalances(sourceChainId);
   
   // Approval
   const sourceConfig = getChainConfig(sourceChainId);
@@ -359,7 +359,18 @@ export default function BridgePage() {
           receiverAddress: address as `0x${string}`,
         });
       }
+      // Clear amount after successful bridge
       setAmount("");
+      
+      // Refresh balances after a short delay to allow for block confirmation
+      setTimeout(() => {
+        refetchBalances();
+      }, 2000);
+      
+      // Refresh again after longer delay for cross-chain updates
+      setTimeout(() => {
+        refetchBalances();
+      }, 10000);
     } catch (error) {
       console.error("Bridge failed:", error);
     }

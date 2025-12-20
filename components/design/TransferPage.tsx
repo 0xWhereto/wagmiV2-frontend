@@ -36,7 +36,8 @@ const getTokenPrice = (symbol: string) => TOKEN_PRICES[symbol] || 0;
 interface TokenWithBalance {
   symbol: string;
   name: string;
-  balance: string;
+  balance: string;      // Formatted balance for display
+  balanceRaw?: string;  // Full precision balance for MAX button / contract calls
   address?: string;
   decimals?: number;
 }
@@ -57,13 +58,14 @@ export function TransferPage() {
 
   // Get tokens for source chain
   const sourceTokens = useMemo(() => getTokensForChain(fromChain.id), [fromChain.id]);
-  const { balances } = useAllTokenBalances(fromChain.id);
+  const { balances, refetch: refetchBalances } = useAllTokenBalances(fromChain.id);
 
-  // Convert tokens to format with balances
+  // Convert tokens to format with balances (include balanceRaw for MAX button)
   const tokensWithBalances = useMemo(() => {
     return sourceTokens.map((token) => ({
       ...token,
       balance: balances[token.symbol]?.balanceFormatted || '0.00',
+      balanceRaw: balances[token.symbol]?.balanceRaw || '0', // Full precision for MAX
     }));
   }, [sourceTokens, balances]);
 
@@ -91,10 +93,11 @@ export function TransferPage() {
   useEffect(() => {
     if (tokensWithBalances.length > 0 && selectedToken) {
       const updated = tokensWithBalances.find(t => t.symbol === selectedToken.symbol);
-      if (updated && updated.balance !== selectedToken.balance) {
+      if (updated && (updated.balance !== selectedToken.balance || updated.balanceRaw !== selectedToken.balanceRaw)) {
         setSelectedToken(prev => ({
           ...prev,
           balance: updated.balance,
+          balanceRaw: updated.balanceRaw,
         }));
       }
     }
@@ -146,20 +149,38 @@ export function TransferPage() {
 
     const receiver = (receiverAddress || address || '0x') as `0x${string}`;
 
-    if (direction === 'toHub') {
-      await bridgeToHub({
-        sourceChainId: selectedChain.id,
-        tokenSymbol: selectedToken.symbol,
-        amount: amount,
-        receiverAddress: receiver,
-      });
-    } else {
-      await bridgeFromHub({
-        destChainId: selectedChain.id,
-        tokenSymbol: selectedToken.symbol,
-        amount: amount,
-        receiverAddress: receiver,
-      });
+    try {
+      if (direction === 'toHub') {
+        await bridgeToHub({
+          sourceChainId: selectedChain.id,
+          tokenSymbol: selectedToken.symbol,
+          amount: amount,
+          receiverAddress: receiver,
+        });
+      } else {
+        await bridgeFromHub({
+          destChainId: selectedChain.id,
+          tokenSymbol: selectedToken.symbol,
+          amount: amount,
+          receiverAddress: receiver,
+        });
+      }
+
+      // Clear amount after successful transfer
+      setAmount('');
+      
+      // Refresh balances after a short delay to allow for block confirmation
+      setTimeout(() => {
+        refetchBalances();
+      }, 2000);
+      
+      // Refresh again after longer delay for cross-chain updates
+      setTimeout(() => {
+        refetchBalances();
+      }, 10000);
+    } catch (error) {
+      // Error is handled by the hook, just log it
+      console.error('Transfer failed:', error);
     }
   };
 

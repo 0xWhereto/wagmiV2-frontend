@@ -10,7 +10,8 @@ import { getTokenLogoBySymbol } from '@/lib/tokens/logos';
 interface Token {
   symbol: string;
   name: string;
-  balance: string;
+  balance: string;      // Formatted balance for display
+  balanceRaw?: string;  // Full precision balance for MAX button
   address?: string;
   decimals?: number;
 }
@@ -39,7 +40,9 @@ export function TokenInput({
   const [isSelectingToken, setIsSelectingToken] = useState(false);
 
   const handleMaxClick = () => {
-    onAmountChange(token.balance.replace(/,/g, ''));
+    // Use balanceRaw (full precision) if available, fallback to balance
+    const maxAmount = token.balanceRaw || token.balance.replace(/,/g, '');
+    onAmountChange(maxAmount);
   };
 
   return (
