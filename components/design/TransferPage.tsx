@@ -9,6 +9,7 @@ import { useAccount, useSwitchChain } from 'wagmi';
 import { useAllTokenBalances } from '@/hooks/useTokenBalances';
 import { useBridgeTransaction } from '@/hooks/useBridgeTransaction';
 import { useTokenApproval } from '@/hooks/useTokenApproval';
+import { useGatewayBalance } from '@/hooks/useGatewayBalance';
 import { getTokensForChain } from '@/lib/tokens/tokenList';
 import { getTokenLogoBySymbol } from '@/lib/tokens/logos';
 import { getChainConfig } from '@/lib/contracts/config';
@@ -120,6 +121,9 @@ export function TransferPage() {
     chainId: fromChain.id,
     spenderAddress: spenderAddress,
   });
+
+  // Gateway balance - show available liquidity when bridging FROM Hub
+  const gatewayBalance = useGatewayBalance(toChain.id, selectedToken.symbol);
 
   const handleSwapDirection = () => {
     setDirection(direction === 'toHub' ? 'fromHub' : 'toHub');
@@ -363,6 +367,19 @@ export function TransferPage() {
                         <span className="text-amber-400">Approval needed</span>
                       ) : (
                         <span className="text-emerald-400">✓ Approved</span>
+                      )}
+                    </div>
+                  )}
+                  {/* Available liquidity on gateway for bridge FROM hub */}
+                  {direction === 'fromHub' && !gatewayBalance.error && (
+                    <div className="flex items-center justify-between text-sm pt-2 border-t border-zinc-700/50">
+                      <span className="text-zinc-500">Available on {toChain.name}</span>
+                      {gatewayBalance.isLoading ? (
+                        <span className="text-zinc-400">Loading...</span>
+                      ) : (
+                        <span className="text-zinc-300">
+                          {gatewayBalance.balanceFormatted} {gatewayBalance.nativeSymbol}
+                        </span>
                       )}
                     </div>
                   )}
