@@ -8,6 +8,7 @@ import { Header } from "@/components/Header";
 import { useAllTokenBalances } from "@/hooks/useTokenBalances";
 import { useTokenApproval } from "@/hooks/useTokenApproval";
 import { useBridgeTransaction } from "@/hooks/useBridgeTransaction";
+import { useGatewayBalance } from "@/hooks/useGatewayBalance";
 import { getTokenLogoBySymbol, getChainLogo } from "@/lib/tokens/logos";
 import { getTokensForChain, type Token } from "@/lib/tokens/tokenList";
 import { getChainConfig } from "@/lib/contracts/config";
@@ -297,6 +298,9 @@ export default function BridgePage() {
   // Bridge transaction
   const { bridgeToHub: bridgeToHubFn, bridgeFromHub: bridgeFromHubFn, isLoading: isBridging } = useBridgeTransaction();
   
+  // Gateway balance (for bridging from Hub)
+  const gatewayBalance = useGatewayBalance(destChainId, selectedToken);
+  
   // Auto-switch chain
   useEffect(() => {
     if (isConnected && switchChain && chain?.id !== sourceChainId) {
@@ -491,6 +495,25 @@ export default function BridgePage() {
                   </span>
                 ) : (
                   <span style={{ color: "#10B981" }}>✓ Approved</span>
+                )}
+              </div>
+            )}
+            {/* Available liquidity for bridge from Hub */}
+            {bridgeFromHub && (
+              <div className="flex items-center justify-between text-sm pt-2 border-t border-gray-800">
+                <span className="text-gray-500">Available on {CHAIN_DISPLAY[destChainId]?.name}</span>
+                {gatewayBalance.isLoading ? (
+                  <span className="text-gray-400">Loading...</span>
+                ) : gatewayBalance.error ? (
+                  <span className="text-gray-400">--</span>
+                ) : (
+                  <span className={
+                    amount && parseFloat(amount) > parseFloat(gatewayBalance.balance) / 1e18 
+                      ? "text-amber-400" 
+                      : "text-white"
+                  }>
+                    {gatewayBalance.balanceFormatted} {receiveToken}
+                  </span>
                 )}
               </div>
             )}

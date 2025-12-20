@@ -135,6 +135,10 @@ export const SONIC_TOKENS: Token[] = [
     tags: ['synthetic'],
     coingeckoId: 'usd-coin', // Use USDC price
   }),
+  createToken(146, '0x2F0324268031E6413280F3B5ddBc4A97639A284a', 'sWBTC', 'Synthetic WBTC', 8, { 
+    tags: ['synthetic'],
+    coingeckoId: 'wrapped-bitcoin', // Use WBTC price
+  }),
 ];
 
 // ============================================
@@ -206,7 +210,7 @@ export function getPopularTokens(chainId: number): Token[] {
     1: ['WETH', 'USDC', 'USDT', 'DAI', 'WBTC'],
     42161: ['WETH', 'USDC', 'ARB', 'GMX', 'WBTC'],
     8453: ['WETH', 'USDC', 'USDbC', 'DAI', 'cbETH'],
-    146: ['S', 'sWETH', 'sUSDT', 'sUSDC'],
+    146: ['S', 'sWETH', 'sUSDT', 'sUSDC', 'sWBTC'],
   };
   
   const popularSymbols = popular[chainId] || [];
