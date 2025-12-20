@@ -18,6 +18,7 @@ interface GatewayBalance {
   balanceFormatted: string;
   isLoading: boolean;
   error: string | null;
+  nativeSymbol: string;
 }
 
 /**
@@ -35,6 +36,7 @@ export function useGatewayBalance(
   const [balanceFormatted, setBalanceFormatted] = useState<string>("0.00");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nativeSymbol, setNativeSymbol] = useState<string>("");
 
   useEffect(() => {
     const fetchBalance = async () => {
@@ -43,6 +45,7 @@ export function useGatewayBalance(
       if (!destConfig || destConfig.isHubChain) {
         setBalance("0");
         setBalanceFormatted("0.00");
+        setNativeSymbol("");
         return;
       }
 
@@ -54,12 +57,20 @@ export function useGatewayBalance(
       }
 
       // Map synthetic token to native token on destination chain
-      // e.g., sWETH -> WETH, sUSDC -> USDC
-      const nativeSymbol = tokenSymbol.replace(/^s/, "");
-      const token = getTokenBySymbol(destChainId, nativeSymbol);
+      // e.g., sWETH -> WETH, sUSDC -> USDC, sWBTC -> WBTC
+      // Handle edge case: "S" is native Sonic token (not bridgeable to other chains via gateway)
+      let mappedNativeSymbol = tokenSymbol;
+      if (tokenSymbol.startsWith("s") && tokenSymbol.length > 1 && tokenSymbol !== "S") {
+        mappedNativeSymbol = tokenSymbol.slice(1); // Remove leading 's'
+      }
+      
+      setNativeSymbol(mappedNativeSymbol);
+      
+      const token = getTokenBySymbol(destChainId, mappedNativeSymbol);
       
       if (!token) {
-        setError(`Token ${nativeSymbol} not found on chain ${destChainId}`);
+        // Token not supported for bridging (e.g., native "S" token)
+        setError(`Not bridgeable`);
         setBalance("0");
         setBalanceFormatted("0.00");
         return;
@@ -114,6 +125,6 @@ export function useGatewayBalance(
     fetchBalance();
   }, [destChainId, tokenSymbol]);
 
-  return { balance, balanceFormatted, isLoading, error };
+  return { balance, balanceFormatted, isLoading, error, nativeSymbol };
 }
 

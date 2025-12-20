@@ -499,20 +499,14 @@ export default function BridgePage() {
               </div>
             )}
             {/* Available liquidity for bridge from Hub */}
-            {bridgeFromHub && (
+            {bridgeFromHub && !gatewayBalance.error && (
               <div className="flex items-center justify-between text-sm pt-2 border-t border-gray-800">
                 <span className="text-gray-500">Available on {CHAIN_DISPLAY[destChainId]?.name}</span>
                 {gatewayBalance.isLoading ? (
                   <span className="text-gray-400">Loading...</span>
-                ) : gatewayBalance.error ? (
-                  <span className="text-gray-400">--</span>
                 ) : (
-                  <span className={
-                    amount && parseFloat(amount) > parseFloat(gatewayBalance.balance) / 1e18 
-                      ? "text-amber-400" 
-                      : "text-white"
-                  }>
-                    {gatewayBalance.balanceFormatted} {receiveToken}
+                  <span className="text-white">
+                    {gatewayBalance.balanceFormatted} {gatewayBalance.nativeSymbol || receiveToken}
                   </span>
                 )}
               </div>
