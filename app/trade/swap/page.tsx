@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Header, SwapCard, PriceChart } from '@/components/design';
 
-export default function HomePage() {
+export default function SwapPage() {
   const [chartTokens, setChartTokens] = useState({ from: 'WETH', to: 'USDC' });
   
   const handleTokensChange = useCallback((from: string, to: string) => {
@@ -43,3 +43,4 @@ export default function HomePage() {
     </div>
   );
 }
+

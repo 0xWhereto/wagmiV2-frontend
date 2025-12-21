@@ -9,6 +9,6 @@ export { LiquidityPage } from './LiquidityPage';
 export { GMIPage } from './GMIPage';
 export { DashboardPage } from './DashboardPage';
 export { TransferPage } from './TransferPage';
-export { USDWPage } from './USDWPage';
+export { USDWPage, USDWPage as MIMPage } from './USDWPage';
 export { DustTransition, PageTransitionWrapper } from './DustTransition';
 

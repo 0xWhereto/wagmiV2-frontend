@@ -4,6 +4,8 @@ import { Wallet, Settings, ChevronDown, Moon, Filter } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import WagmiLogo from '../icons/WagmiLogo';
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -20,11 +22,6 @@ function Portal({ children }: { children: React.ReactNode }) {
   if (!mounted) return null;
 
   return createPortal(children, document.body);
-}
-
-interface HeaderProps {
-  onNavigate: (page: 'swap' | 'liquidity' | 'dashboard' | 'gmi' | 'transfer' | 'usdw') => void;
-  currentPage: 'swap' | 'liquidity' | 'dashboard' | 'gmi' | 'transfer' | 'usdw';
 }
 
 // Toggle Switch Component
@@ -48,7 +45,8 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (value: boo
   );
 }
 
-export function Header({ onNavigate, currentPage }: HeaderProps) {
+export function Header() {
+  const pathname = usePathname();
   const [isTradeOpen, setIsTradeOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [tradeButtonRect, setTradeButtonRect] = useState<DOMRect | null>(null);
@@ -59,6 +57,13 @@ export function Header({ onNavigate, currentPage }: HeaderProps) {
   const { address, isConnected } = useAccount();
   const { connectors, connect } = useConnect();
   const { disconnect } = useDisconnect();
+
+  // Determine active state based on pathname
+  const isTradeActive = pathname === '/' || pathname?.startsWith('/trade');
+  const isMagicPoolActive = pathname === '/magicpool';
+  const isGMIActive = pathname === '/gmi';
+  const isLiquidityActive = pathname === '/liquidity';
+  const isDashboardActive = pathname === '/dashboard';
 
   const handleTradeClick = () => {
     if (tradeButtonRef.current) {
@@ -85,16 +90,19 @@ export function Header({ onNavigate, currentPage }: HeaderProps) {
     <header className="relative z-[100] backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-8">
-          <div className="w-8 h-8">
+          <Link href="/" className="w-8 h-8">
             <WagmiLogo />
-          </div>
+          </Link>
 
           <nav className="flex items-center gap-6">
+            {/* Trade Dropdown */}
             <div className="relative">
               <button
                 ref={tradeButtonRef}
                 onClick={handleTradeClick}
-                className="flex items-center gap-2 text-zinc-100 hover:text-white transition-colors"
+                className={`flex items-center gap-2 transition-colors ${
+                  isTradeActive ? 'text-zinc-100' : 'text-zinc-400 hover:text-zinc-100'
+                }`}
               >
                 Trade
                 <ChevronDown className={`w-4 h-4 transition-transform ${isTradeOpen ? 'rotate-180' : ''}`} />
@@ -120,63 +128,58 @@ export function Header({ onNavigate, currentPage }: HeaderProps) {
                       }}
                       className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden shadow-2xl z-[9999] min-w-[160px]"
                     >
-                      <button
-                        onClick={() => {
-                          setIsTradeOpen(false);
-                          onNavigate('swap');
-                        }}
-                        className="w-full px-4 py-3 text-left text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                      <Link
+                        href="/trade/swap"
+                        onClick={() => setIsTradeOpen(false)}
+                        className={`block w-full px-4 py-3 text-left transition-colors ${
+                          pathname === '/trade/swap' || pathname === '/'
+                            ? 'bg-zinc-800 text-white'
+                            : 'text-zinc-300 hover:bg-zinc-800 hover:text-white'
+                        }`}
                       >
                         Swap
-                      </button>
-                      <button
-                        onClick={() => {
-                          setIsTradeOpen(false);
-                          onNavigate('liquidity');
-                        }}
-                        className="w-full px-4 py-3 text-left text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
-                      >
-                        Leverage
-                      </button>
-                      <button
-                        onClick={() => {
-                          setIsTradeOpen(false);
-                          onNavigate('transfer');
-                        }}
-                        className="w-full px-4 py-3 text-left text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                      </Link>
+                      <Link
+                        href="/trade/transfer"
+                        onClick={() => setIsTradeOpen(false)}
+                        className={`block w-full px-4 py-3 text-left transition-colors ${
+                          pathname === '/trade/transfer'
+                            ? 'bg-zinc-800 text-white'
+                            : 'text-zinc-300 hover:bg-zinc-800 hover:text-white'
+                        }`}
                       >
                         Transfer
-                      </button>
+                      </Link>
                     </motion.div>
                   </Portal>
                 )}
               </AnimatePresence>
             </div>
 
-            <button
-              className={`transition-colors ${currentPage === 'usdw' ? 'text-zinc-100' : 'text-zinc-400 hover:text-zinc-100'}`}
-              onClick={() => onNavigate('usdw')}
+            <Link
+              href="/magicpool"
+              className={`transition-colors ${isMagicPoolActive ? 'text-zinc-100' : 'text-zinc-400 hover:text-zinc-100'}`}
             >
               MagicPool
-            </button>
-            <button
-              className={`transition-colors ${currentPage === 'gmi' ? 'text-zinc-100' : 'text-zinc-400 hover:text-zinc-100'}`}
-              onClick={() => onNavigate('gmi')}
+            </Link>
+            <Link
+              href="/gmi"
+              className={`transition-colors ${isGMIActive ? 'text-zinc-100' : 'text-zinc-400 hover:text-zinc-100'}`}
             >
               GMI
-            </button>
-            <button
-              className={`transition-colors ${currentPage === 'liquidity' ? 'text-zinc-100' : 'text-zinc-400 hover:text-zinc-100'}`}
-              onClick={() => onNavigate('liquidity')}
+            </Link>
+            <Link
+              href="/liquidity"
+              className={`transition-colors ${isLiquidityActive ? 'text-zinc-100' : 'text-zinc-400 hover:text-zinc-100'}`}
             >
               Liquidity
-            </button>
-            <button
-              className={`transition-colors ${currentPage === 'dashboard' ? 'text-zinc-100' : 'text-zinc-400 hover:text-zinc-100'}`}
-              onClick={() => onNavigate('dashboard')}
+            </Link>
+            <Link
+              href="/dashboard"
+              className={`transition-colors ${isDashboardActive ? 'text-zinc-100' : 'text-zinc-400 hover:text-zinc-100'}`}
             >
               Dashboard
-            </button>
+            </Link>
           </nav>
         </div>
 
@@ -262,4 +265,3 @@ export function Header({ onNavigate, currentPage }: HeaderProps) {
     </header>
   );
 }
-
