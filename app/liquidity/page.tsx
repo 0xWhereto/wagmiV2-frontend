@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { useAccount, useSwitchChain } from "wagmi";
 import { parseUnits, formatUnits } from "viem";
 import { Header } from "@/components/Header";
-import { getTokenLogoBySymbol } from "@/lib/tokens/logos";
+import { getTokenLogoBySymbol, getChainLogo } from "@/lib/tokens/logos";
 import { getTokensForChain, type Token } from "@/lib/tokens/tokenList";
 import { 
   useLiquidity, 
@@ -21,19 +21,11 @@ import {
   MAX_TICK,
   type Position as V3Position 
 } from "@/lib/contracts/hooks/useLiquidity";
-import { useAllPools, type PoolData } from "@/lib/contracts/hooks/usePoolData";
 import { useToast } from "@/components/Toast";
 import { useAllTokenBalances } from "@/hooks/useTokenBalances";
 
 // Hub chain ID (Sonic)
 const HUB_CHAIN_ID = 146;
-
-// Format large numbers
-function formatUsd(value: number): string {
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
-  return `$${value.toFixed(2)}`;
-}
 
 // Display position interface
 export interface DisplayPosition {
@@ -57,100 +49,6 @@ export interface DisplayPosition {
   inRange: boolean;
   tokensOwed0: bigint;
   tokensOwed1: bigint;
-  valueUsd?: number;
-}
-
-// Stats Card Component
-function StatsCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="flex-1 p-5 bg-zinc-900/50 rounded-xl">
-      <div className="flex items-center gap-2 text-zinc-500 text-sm mb-2">
-        {icon}
-        <span>{label}</span>
-      </div>
-      <div className="text-2xl font-semibold text-white">{value}</div>
-    </div>
-  );
-}
-
-// Pool Row Component
-function PoolRow({ 
-  pool, 
-  userHasPosition,
-  onAddLiquidity,
-  onManage 
-}: { 
-  pool: PoolData;
-  userHasPosition: boolean;
-  onAddLiquidity: () => void;
-  onManage: () => void;
-}) {
-  const token0Logo = getTokenLogoBySymbol(pool.token0Symbol);
-  const token1Logo = getTokenLogoBySymbol(pool.token1Symbol);
-
-  return (
-    <div className="flex items-center justify-between py-4 px-5 border-b border-zinc-800/50 hover:bg-zinc-900/30 transition-colors">
-      {/* Pair Info */}
-      <div className="flex items-center gap-3 min-w-[200px]">
-        <div className="flex -space-x-2">
-          <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-zinc-950 bg-zinc-800">
-            <Image src={token0Logo} alt={pool.token0Symbol} width={32} height={32} className="w-full h-full object-cover" />
-          </div>
-          <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-zinc-950 bg-zinc-800">
-            <Image src={token1Logo} alt={pool.token1Symbol} width={32} height={32} className="w-full h-full object-cover" />
-          </div>
-        </div>
-        <div>
-          <div className="font-medium text-white">{pool.token0Symbol} / {pool.token1Symbol}</div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-zinc-500">{pool.fee / 10000}%</span>
-            {userHasPosition && (
-              <span className="px-2 py-0.5 text-xs font-medium rounded bg-emerald-500/10 text-emerald-400">
-                Active
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* TVL */}
-      <div className="text-right min-w-[100px]">
-        <div className="text-xs text-zinc-500">TVL</div>
-        <div className="text-white">{formatUsd(pool.tvlUsd)}</div>
-      </div>
-
-      {/* Volume */}
-      <div className="text-right min-w-[100px]">
-        <div className="text-xs text-zinc-500">24h Volume</div>
-        <div className="text-white">{formatUsd(pool.volume24h)}</div>
-      </div>
-
-      {/* APY */}
-      <div className="text-right min-w-[80px]">
-        <div className="text-xs text-zinc-500">APY</div>
-        <div className="text-white font-medium">{pool.apy.toFixed(1)}%</div>
-      </div>
-
-      {/* Action Button */}
-      <div className="min-w-[120px] text-right">
-        {userHasPosition ? (
-          <button
-            onClick={onManage}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-zinc-950 hover:bg-zinc-200 transition-all"
-          >
-            Manage
-          </button>
-        ) : (
-          <button
-            onClick={onAddLiquidity}
-            className="px-4 py-2 rounded-lg text-sm font-medium border border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:text-white transition-all"
-          >
-            Add Liquidity
-          </button>
-        )}
-      </div>
-    </div>
-  );
 }
 
 // Position Card Component
@@ -175,16 +73,16 @@ function PositionCard({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="flex -space-x-2">
-            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-zinc-950 bg-zinc-800">
+            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-zinc-950">
               <Image src={token0Logo} alt={position.token0} width={40} height={40} className="w-full h-full object-cover" />
             </div>
-            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-zinc-950 bg-zinc-800">
+            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-zinc-950">
               <Image src={token1Logo} alt={position.token1} width={40} height={40} className="w-full h-full object-cover" />
             </div>
           </div>
           <div>
             <div className="font-medium text-zinc-100">{position.token0} / {position.token1}</div>
-            <div className="text-xs text-zinc-500">{position.fee / 10000}% fee • ID #{position.tokenId.toString()}</div>
+            <div className="text-xs text-zinc-500">{position.fee / 10000}% fee</div>
           </div>
         </div>
         <span 
@@ -199,28 +97,16 @@ function PositionCard({
       </div>
       
       {/* Price Range */}
-      <div className="flex justify-between text-sm mb-4 p-3 bg-zinc-800/30 rounded-lg">
+      <div className="flex justify-between text-sm mb-4">
         <div>
           <span className="text-zinc-500">Min: </span>
           <span className="text-zinc-100">{position.minPrice.toFixed(4)}</span>
-        </div>
-        <div>
-          <span className="text-zinc-500">Current: </span>
-          <span className="text-zinc-100">{position.currentPrice > 0 ? position.currentPrice.toFixed(4) : "—"}</span>
         </div>
         <div>
           <span className="text-zinc-500">Max: </span>
           <span className="text-zinc-100">{position.maxPrice.toFixed(4)}</span>
         </div>
       </div>
-      
-      {/* Value estimate */}
-      {position.valueUsd !== undefined && position.valueUsd > 0 && (
-        <div className="text-sm mb-4">
-          <span className="text-zinc-500">Estimated Value: </span>
-          <span className="text-white font-medium">{formatUsd(position.valueUsd)}</span>
-        </div>
-      )}
       
       {/* Actions */}
       <div className="flex gap-3">
@@ -271,7 +157,6 @@ function TokenSelector({
   return (
     <div className="relative">
       <button
-        type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all hover:bg-white/5"
         style={{ background: "transparent" }}
@@ -296,6 +181,7 @@ function TokenSelector({
               className="absolute top-full left-0 mt-2 w-64 rounded-lg overflow-hidden z-50"
               style={{ background: "#1a1a1a" }}
             >
+              {/* Search Input */}
               <div className="p-3 border-b border-zinc-900">
                 <input
                   type="text"
@@ -306,13 +192,20 @@ function TokenSelector({
                   className="w-full bg-transparent text-white text-sm placeholder-gray-500 focus:outline-none"
                 />
               </div>
-              <div className="max-h-56 overflow-y-auto">
+              
+              {/* Token List */}
+              <div 
+                className="max-h-56 overflow-y-auto"
+                style={{
+                  scrollbarWidth: "thin",
+                  scrollbarColor: "#374151 transparent",
+                }}
+              >
                 {availableTokens.length === 0 ? (
                   <div className="px-4 py-3 text-sm text-gray-500">No tokens found</div>
                 ) : (
                   availableTokens.map((token) => (
                     <button
-                      type="button"
                       key={token.symbol}
                       onClick={() => {
                         onChange(token.symbol);
@@ -344,33 +237,22 @@ function TokenSelector({
 function AddLiquidityModal({
   isOpen,
   onClose,
-  preselectedPool,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  preselectedPool?: PoolData;
 }) {
   const { address, isConnected } = useAccount();
   const { addToast } = useToast();
   const { balances } = useAllTokenBalances(HUB_CHAIN_ID);
   const hubTokens = getTokensForChain(HUB_CHAIN_ID);
   
-  const [token0Symbol, setToken0Symbol] = useState(preselectedPool?.token0Symbol || "sWETH");
-  const [token1Symbol, setToken1Symbol] = useState(preselectedPool?.token1Symbol || "sUSDC");
+  const [token0Symbol, setToken0Symbol] = useState("sWETH");
+  const [token1Symbol, setToken1Symbol] = useState("sUSDC");
   const [amount0, setAmount0] = useState("");
   const [amount1, setAmount1] = useState("");
-  const [selectedFee, setSelectedFee] = useState(preselectedPool?.fee || 3000);
+  const [selectedFee, setSelectedFee] = useState(3000);
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
-
-  // Update when preselected pool changes
-  useEffect(() => {
-    if (preselectedPool) {
-      setToken0Symbol(preselectedPool.token0Symbol);
-      setToken1Symbol(preselectedPool.token1Symbol);
-      setSelectedFee(preselectedPool.fee);
-    }
-  }, [preselectedPool]);
   
   const token0 = hubTokens.find(t => t.symbol === token0Symbol);
   const token1 = hubTokens.find(t => t.symbol === token1Symbol);
@@ -392,11 +274,12 @@ function AddLiquidityModal({
   
   const { sqrtPriceX96, liquidity: poolLiquidity } = usePoolInfo(poolAddress as `0x${string}` | undefined);
   
-  // Calculate current price
+  // Calculate current price from sqrtPriceX96
   const currentPrice = useMemo(() => {
     if (!sqrtPriceX96 || !sortedToken0 || !sortedToken1) return undefined;
     const Q96 = Math.pow(2, 96);
     const price = Math.pow(Number(sqrtPriceX96) / Q96, 2);
+    // Adjust for decimals
     const decimalAdjustment = Math.pow(10, (sortedToken0.decimals || 18) - (sortedToken1.decimals || 18));
     return price * decimalAdjustment;
   }, [sqrtPriceX96, sortedToken0, sortedToken1]);
@@ -410,9 +293,11 @@ function AddLiquidityModal({
       const token0Decimals = sortedToken0.decimals || 18;
       const token1Decimals = sortedToken1.decimals || 18;
       
+      // Parse amounts
       const amount0Wei = parseUnits(amount0 || "0", token0Decimals);
       const amount1Wei = parseUnits(amount1 || "0", token1Decimals);
       
+      // Get ticks from prices (adjusted for decimals)
       const tickSpacing = getTickSpacing(selectedFee);
       const decimalAdjustment = Math.pow(10, token1Decimals - token0Decimals);
       const minTick = minPrice ? nearestUsableTick(
@@ -457,6 +342,7 @@ function AddLiquidityModal({
         className="w-full max-w-md rounded-xl p-6"
         style={{ background: "#0f0f0f", border: "1px solid #1f1f1f" }}
       >
+        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold text-white">Add Liquidity</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-white transition-all">
@@ -466,7 +352,7 @@ function AddLiquidityModal({
           </button>
         </div>
         
-        {/* Token Pair */}
+        {/* Token Pair Selection */}
         <div className="mb-6">
           <div className="text-sm text-gray-500 mb-2">Select Pair</div>
           <div className="flex items-center gap-3">
@@ -483,7 +369,6 @@ function AddLiquidityModal({
             {FEE_TIERS.map((tier) => (
               <button
                 key={tier.fee}
-                type="button"
                 onClick={() => setSelectedFee(tier.fee)}
                 className="py-2 rounded-lg text-sm font-medium transition-all"
                 style={{
@@ -497,14 +382,6 @@ function AddLiquidityModal({
             ))}
           </div>
         </div>
-
-        {/* Current Price */}
-        {currentPrice && (
-          <div className="mb-6 p-3 bg-zinc-800/30 rounded-lg text-sm">
-            <span className="text-zinc-500">Current Price: </span>
-            <span className="text-white">{currentPrice.toFixed(4)} {token1Symbol} per {token0Symbol}</span>
-          </div>
-        )}
         
         {/* Amounts */}
         <div className="mb-6">
@@ -516,7 +393,6 @@ function AddLiquidityModal({
                   <Image src={getTokenLogoBySymbol(token0Symbol)} alt={token0Symbol} width={20} height={20} />
                 </div>
                 <span className="text-sm text-white">{token0Symbol}</span>
-                <span className="text-xs text-zinc-500">(Bal: {balances[token0Symbol]?.balanceFormatted || "0"})</span>
               </div>
               <input
                 type="number"
@@ -532,7 +408,6 @@ function AddLiquidityModal({
                   <Image src={getTokenLogoBySymbol(token1Symbol)} alt={token1Symbol} width={20} height={20} />
                 </div>
                 <span className="text-sm text-white">{token1Symbol}</span>
-                <span className="text-xs text-zinc-500">(Bal: {balances[token1Symbol]?.balanceFormatted || "0"})</span>
               </div>
               <input
                 type="number"
@@ -547,7 +422,7 @@ function AddLiquidityModal({
         
         {/* Price Range */}
         <div className="mb-6">
-          <div className="text-sm text-gray-500 mb-2">Price Range (optional for full range)</div>
+          <div className="text-sm text-gray-500 mb-2">Price Range</div>
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="text-xs text-gray-500 mb-1 block">Min Price</label>
@@ -555,7 +430,7 @@ function AddLiquidityModal({
                 type="number"
                 value={minPrice}
                 onChange={(e) => setMinPrice(e.target.value)}
-                placeholder="0 (Full)"
+                placeholder="0"
                 className="w-full bg-transparent text-white px-3 py-2 rounded-lg border border-gray-700 focus:outline-none focus:border-gray-500"
               />
             </div>
@@ -565,15 +440,15 @@ function AddLiquidityModal({
                 type="number"
                 value={maxPrice}
                 onChange={(e) => setMaxPrice(e.target.value)}
-                placeholder="∞ (Full)"
+                placeholder="∞"
                 className="w-full bg-transparent text-white px-3 py-2 rounded-lg border border-gray-700 focus:outline-none focus:border-gray-500"
               />
             </div>
           </div>
         </div>
         
+        {/* Add Button */}
         <button
-          type="button"
           onClick={handleAddLiquidity}
           disabled={isLoading || !amount0 || !amount1}
           className="w-full py-4 rounded-xl font-semibold transition-all disabled:opacity-40"
@@ -582,7 +457,7 @@ function AddLiquidityModal({
             color: isLoading || !amount0 || !amount1 ? "#9CA3AF" : "#0f0f0f",
           }}
         >
-          {isLoading ? "Adding..." : poolExists ? "Add Liquidity" : "Create Pool & Add Liquidity"}
+          {isLoading ? "Adding..." : "Add Liquidity"}
         </button>
       </motion.div>
     </div>
@@ -652,14 +527,13 @@ function RemoveLiquidityModal({
           max="100"
           value={percentage}
           onChange={(e) => setPercentage(parseInt(e.target.value))}
-          className="w-full mb-6 accent-white"
+          className="w-full mb-6"
         />
         
         <div className="flex gap-2 mb-6">
           {[25, 50, 75, 100].map((p) => (
             <button
               key={p}
-              type="button"
               onClick={() => setPercentage(p)}
               className="flex-1 py-2 rounded-lg text-sm font-medium transition-all"
               style={{
@@ -674,7 +548,6 @@ function RemoveLiquidityModal({
         </div>
         
         <button
-          type="button"
           onClick={handleRemove}
           disabled={isLoading}
           className="w-full py-4 rounded-xl font-semibold transition-all disabled:opacity-40"
@@ -696,18 +569,13 @@ export default function LiquidityPage() {
   const { switchChain } = useSwitchChain();
   const { addToast } = useToast();
   
-  const [activeTab, setActiveTab] = useState<"all" | "positions">("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<"positions" | "pools">("positions");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<DisplayPosition | null>(null);
-  const [selectedPool, setSelectedPool] = useState<PoolData | undefined>(undefined);
-  
-  // Fetch pools data
-  const { pools, stats, isLoading: poolsLoading, refetch: refetchPools } = useAllPools();
   
   // Fetch user's positions
-  const { positions, fetchPositions, collectFees, isLoading: positionsLoading } = useLiquidity();
+  const { positions, fetchPositions, collectFees, isLoading } = useLiquidity();
   
   // Auto-switch to Hub chain
   useEffect(() => {
@@ -716,87 +584,31 @@ export default function LiquidityPage() {
     }
   }, [isConnected, switchChain, chain?.id]);
 
-  // Filter pools by search
-  const filteredPools = useMemo(() => {
-    if (!searchQuery) return pools;
-    const query = searchQuery.toLowerCase();
-    return pools.filter(p => 
-      p.token0Symbol.toLowerCase().includes(query) ||
-      p.token1Symbol.toLowerCase().includes(query)
-    );
-  }, [pools, searchQuery]);
-
   // Transform positions for display
   const displayPositions: DisplayPosition[] = useMemo(() => {
-    return positions.map((p) => {
-      const minPrice = tickToPrice(p.tickLower) / Math.pow(10, (p.token1Decimals || 18) - (p.token0Decimals || 18));
-      const maxPrice = tickToPrice(p.tickUpper) / Math.pow(10, (p.token1Decimals || 18) - (p.token0Decimals || 18));
-      
-      // Find matching pool for current price
-      const matchingPool = pools.find(pool => 
-        (pool.token0Address.toLowerCase() === p.token0.toLowerCase() && 
-         pool.token1Address.toLowerCase() === p.token1.toLowerCase() &&
-         pool.fee === p.fee) ||
-        (pool.token0Address.toLowerCase() === p.token1.toLowerCase() && 
-         pool.token1Address.toLowerCase() === p.token0.toLowerCase() &&
-         pool.fee === p.fee)
-      );
-      
-      let currentPrice = 0;
-      let inRange = true;
-      
-      if (matchingPool) {
-        const Q96 = Math.pow(2, 96);
-        const rawPrice = Math.pow(Number(matchingPool.sqrtPriceX96) / Q96, 2);
-        currentPrice = rawPrice * Math.pow(10, (matchingPool.token0Decimals || 18) - (matchingPool.token1Decimals || 18));
-        inRange = matchingPool.tick >= p.tickLower && matchingPool.tick < p.tickUpper;
-      }
-      
-      return {
-        id: p.tokenId.toString(),
-        tokenId: p.tokenId,
-        token0: p.token0Symbol || "???",
-        token1: p.token1Symbol || "???",
-        token0Decimals: p.token0Decimals,
-        token1Decimals: p.token1Decimals,
-        token0Address: p.token0,
-        token1Address: p.token1,
-        chain: "Sonic",
-        chainId: HUB_CHAIN_ID,
-        fee: p.fee,
-        liquidity: p.liquidity,
-        tickLower: p.tickLower,
-        tickUpper: p.tickUpper,
-        minPrice,
-        maxPrice,
-        currentPrice,
-        inRange,
-        tokensOwed0: p.tokensOwed0,
-        tokensOwed1: p.tokensOwed1,
-      };
-    });
-  }, [positions, pools]);
-
-  // Check if user has position in a pool
-  const userPoolPositions = useMemo(() => {
-    const positionMap: Record<string, boolean> = {};
-    for (const pos of displayPositions) {
-      const key = `${pos.token0Address.toLowerCase()}-${pos.token1Address.toLowerCase()}-${pos.fee}`;
-      positionMap[key] = true;
-    }
-    return positionMap;
-  }, [displayPositions]);
-
-  const hasPositionInPool = (pool: PoolData) => {
-    const key = `${pool.token0Address.toLowerCase()}-${pool.token1Address.toLowerCase()}-${pool.fee}`;
-    return userPoolPositions[key] || false;
-  };
-
-  // Calculate user's total liquidity value
-  const userLiquidityUsd = useMemo(() => {
-    // Simplified: sum of position values
-    return displayPositions.reduce((sum, p) => sum + (p.valueUsd || 0), 0);
-  }, [displayPositions]);
+    return positions.map((p, i) => ({
+      id: p.tokenId.toString(),
+      tokenId: p.tokenId,
+      token0: p.token0Symbol || "???",
+      token1: p.token1Symbol || "???",
+      token0Decimals: p.token0Decimals,
+      token1Decimals: p.token1Decimals,
+      token0Address: p.token0,
+      token1Address: p.token1,
+      chain: "Sonic",
+      chainId: HUB_CHAIN_ID,
+      fee: p.fee,
+      liquidity: p.liquidity,
+      tickLower: p.tickLower,
+      tickUpper: p.tickUpper,
+      minPrice: tickToPrice(p.tickLower) / Math.pow(10, (p.token1Decimals || 18) - (p.token0Decimals || 18)),
+      maxPrice: tickToPrice(p.tickUpper) / Math.pow(10, (p.token1Decimals || 18) - (p.token0Decimals || 18)),
+      currentPrice: 0, // Would need to fetch
+      inRange: true, // Would need to calculate
+      tokensOwed0: p.tokensOwed0,
+      tokensOwed1: p.tokensOwed1,
+    }));
+  }, [positions]);
 
   const handleCollectFees = async (position: DisplayPosition) => {
     try {
@@ -810,188 +622,93 @@ export default function LiquidityPage() {
     }
   };
 
-  const handleAddLiquidityToPool = (pool: PoolData) => {
-    setSelectedPool(pool);
-    setShowAddModal(true);
-  };
-
-  const isLoading = poolsLoading || positionsLoading;
-
   return (
     <div className="min-h-screen bg-zinc-950">
       <Header />
 
-      <main className="pt-28 pb-12 px-4">
-        <div className="max-w-6xl mx-auto">
+      <main className="pt-32 pb-12 px-4">
+        <div className="max-w-lg mx-auto">
           
-          {/* Page Header */}
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-white mb-2">Liquidity</h1>
-            
-            {/* Tab Selector */}
-            <div className="flex gap-6 border-b border-zinc-800">
-              <button
-                onClick={() => setActiveTab("all")}
-                className="pb-3 text-sm font-medium transition-all"
-                style={{
-                  color: activeTab === "all" ? "white" : "#6B7280",
-                  borderBottom: activeTab === "all" ? "2px solid white" : "2px solid transparent",
-                }}
-              >
-                V3 Pools
-              </button>
-              <button
-                onClick={() => setActiveTab("positions")}
-                className="pb-3 text-sm font-medium transition-all"
-                style={{
-                  color: activeTab === "positions" ? "white" : "#6B7280",
-                  borderBottom: activeTab === "positions" ? "2px solid white" : "2px solid transparent",
-                }}
-              >
-                My Positions {displayPositions.length > 0 && `(${displayPositions.length})`}
-              </button>
-            </div>
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8">
+            <h1 className="text-xl font-semibold text-white">Liquidity</h1>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+              style={{ background: "white", color: "#0f0f0f" }}
+            >
+              + Add Position
+            </button>
           </div>
 
-          {/* Stats Section */}
-          <div className="flex gap-4 mb-8">
-            <StatsCard 
-              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>}
-              label="Total Value Locked"
-              value={formatUsd(stats.totalTvlUsd)}
-            />
-            <StatsCard 
-              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg>}
-              label="24h Volume"
-              value={formatUsd(stats.totalVolume24h)}
-            />
-            <StatsCard 
-              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>}
-              label="Your Liquidity"
-              value={displayPositions.length > 0 ? formatUsd(userLiquidityUsd) : "$0.00"}
-            />
+          {/* Tabs */}
+          <div className="flex gap-6 mb-8 border-b border-gray-800">
+            <button
+              onClick={() => setActiveTab("positions")}
+              className="pb-3 text-sm font-medium transition-all"
+              style={{
+                color: activeTab === "positions" ? "white" : "#6B7280",
+                borderBottom: activeTab === "positions" ? "2px solid white" : "2px solid transparent",
+              }}
+            >
+              Your Positions
+            </button>
+            <button
+              onClick={() => setActiveTab("pools")}
+              className="pb-3 text-sm font-medium transition-all"
+              style={{
+                color: activeTab === "pools" ? "white" : "#6B7280",
+                borderBottom: activeTab === "pools" ? "2px solid white" : "2px solid transparent",
+              }}
+            >
+              Top Pools
+            </button>
           </div>
 
-          {/* All Pools Tab */}
-          {activeTab === "all" && (
-            <>
-              {/* Controls */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex gap-3">
-                  <button
-                    className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-zinc-950"
-                  >
-                    All Pools
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("positions")}
-                    className="px-4 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:text-white transition-all"
-                  >
-                    My Positions
-                  </button>
-                </div>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search pools..."
-                    className="px-4 py-2 bg-zinc-900/50 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-700 w-64"
-                  />
-                </div>
-              </div>
-
-              {/* Pool List */}
-              <div className="bg-zinc-900/30 rounded-xl overflow-hidden">
-                {isLoading ? (
-                  <div className="text-center py-12 text-zinc-500">Loading pools...</div>
-                ) : filteredPools.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="text-zinc-500 mb-4">No pools found</div>
-                    <button
-                      onClick={() => { setSelectedPool(undefined); setShowAddModal(true); }}
-                      className="px-6 py-3 rounded-lg text-sm font-medium bg-white text-zinc-950"
-                    >
-                      Create Pool
-                    </button>
-                  </div>
-                ) : (
-                  filteredPools.map((pool) => (
-                    <PoolRow
-                      key={pool.address}
-                      pool={pool}
-                      userHasPosition={hasPositionInPool(pool)}
-                      onAddLiquidity={() => handleAddLiquidityToPool(pool)}
-                      onManage={() => {
-                        // Find matching position and open remove modal
-                        const matchingPos = displayPositions.find(p => 
-                          p.token0Address.toLowerCase() === pool.token0Address.toLowerCase() &&
-                          p.token1Address.toLowerCase() === pool.token1Address.toLowerCase() &&
-                          p.fee === pool.fee
-                        );
-                        if (matchingPos) {
-                          setSelectedPosition(matchingPos);
-                          setShowRemoveModal(true);
-                        }
-                      }}
-                    />
-                  ))
-                )}
-              </div>
-            </>
-          )}
-
-          {/* Positions Tab */}
+          {/* Content */}
           {activeTab === "positions" && (
             <>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold text-white">Your Positions</h2>
-                <button
-                  onClick={() => { setSelectedPool(undefined); setShowAddModal(true); }}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-zinc-950"
-                >
-                  + Add Position
-                </button>
-              </div>
-
-              {positionsLoading ? (
-                <div className="text-center py-12 text-zinc-500">Loading positions...</div>
+              {isLoading ? (
+                <div className="text-center py-12">
+                  <div className="text-gray-500">Loading positions...</div>
+                </div>
               ) : displayPositions.length === 0 ? (
-                <div className="text-center py-12 bg-zinc-900/30 rounded-xl">
-                  <div className="text-zinc-500 mb-4">No liquidity positions yet</div>
+                <div className="text-center py-12">
+                  <div className="text-gray-500 mb-4">No liquidity positions yet</div>
                   <button
-                    onClick={() => { setSelectedPool(undefined); setShowAddModal(true); }}
-                    className="px-6 py-3 rounded-lg text-sm font-medium bg-white text-zinc-950"
+                    onClick={() => setShowAddModal(true)}
+                    className="px-6 py-3 rounded-lg text-sm font-medium transition-all"
+                    style={{ background: "white", color: "#0f0f0f" }}
                   >
                     Create Position
                   </button>
                 </div>
               ) : (
-                <div className="grid gap-4">
-                  {displayPositions.map((position) => (
-                    <PositionCard
-                      key={position.id}
-                      position={position}
-                      onManage={() => {
-                        setSelectedPosition(position);
-                        setShowRemoveModal(true);
-                      }}
-                      onCollect={() => handleCollectFees(position)}
-                    />
-                  ))}
-                </div>
+                displayPositions.map((position) => (
+                  <PositionCard
+                    key={position.id}
+                    position={position}
+                    onManage={() => {
+                      setSelectedPosition(position);
+                      setShowRemoveModal(true);
+                    }}
+                    onCollect={() => handleCollectFees(position)}
+                  />
+                ))
               )}
             </>
+          )}
+
+          {activeTab === "pools" && (
+            <div className="text-center py-12">
+              <div className="text-gray-500">Top pools coming soon</div>
+            </div>
           )}
         </div>
       </main>
 
       {/* Modals */}
-      <AddLiquidityModal 
-        isOpen={showAddModal} 
-        onClose={() => { setShowAddModal(false); setSelectedPool(undefined); }} 
-        preselectedPool={selectedPool}
-      />
+      <AddLiquidityModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} />
       <RemoveLiquidityModal 
         isOpen={showRemoveModal} 
         onClose={() => { setShowRemoveModal(false); setSelectedPosition(null); }} 
