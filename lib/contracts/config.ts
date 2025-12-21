@@ -20,6 +20,15 @@ export const CHAIN_CONFIG = {
       swapRouter: "0x8BbF9fF8CE8060B85DFe48d7b7E897d09418De9B",
       nonfungiblePositionManager: "0x5826e10B513C891910032F15292B2F1b3041C3Df",
       quoterV2: "0x57e3e0a9DfB3DA34cc164B2C8dD1EBc404c45d47",
+      // MagicPool contracts
+      mimToken: "0x2321e7dDdC1aF826E1827Ee41C306f8837656846",
+      mimMinter: "0x38FB72EB47213cC75797249a9daC5CD357F2021c",
+      stakingVault: "0x1880d94b47af6c80BbCa973B383221fD53A6e139",
+      // Zero IL Vaults
+      wethZeroILVault: "0x27C42A9184D45A3657b7fEE9cd9969216BAd9CE3",
+      wbtcZeroILVault: "0x1544Dc2A93c148C04dEA54Bd150EBb5BB3948ac2",
+      wethZeroILStrategy: "0x80A13466aE5185d375e5b75b1bA66d47B773858c",
+      wbtcZeroILStrategy: "0xf51Ff777724F8B5Dae8e7BD6295D2d6eA7C89bC8",
     },
     nativeCurrency: {
       name: "Sonic",

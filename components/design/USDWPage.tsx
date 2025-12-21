@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Info, 
@@ -12,22 +12,14 @@ import {
   Percent,
   Shield,
   Clock,
-  ChevronDown,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
-import Image from 'next/image';
-import { useAccount } from 'wagmi';
+import { useAccount, useSwitchChain } from 'wagmi';
+import { parseUnits, formatUnits } from 'viem';
+import { useMagicPool } from '@/lib/contracts/magicpool/useMagicPool';
 
-// Mock data for demonstration
-const MOCK_USER_POSITIONS = {
-  mimBalance: '12,450.00',
-  smimBalance: '8,200.00',
-  smimValue: '8,456.20',
-  pendingRewards: '256.20',
-  totalEarned: '1,234.56',
-};
-
-// Interest Rate Model Parameters (from latest deployment)
+// Interest Rate Model Parameters (from contract)
 const RATE_MODEL = {
   baseRate: 10,         // 10% minimum fixed rate
   multiplier: 12,       // 12%
@@ -37,30 +29,6 @@ const RATE_MODEL = {
 
 const MAX_UTILIZATION = 90; // 90% max utilization cap
 
-const VAULT_STATS = {
-  totalSupplied: '$24,567,890',
-  totalBorrowed: '$18,234,567',
-  utilization: 74.2, // numeric for calculations
-  utilizationDisplay: '74.2%',
-  maxUtilization: 90,
-};
-
-// Calculate interest rate based on utilization - using function declaration for hoisting
-function calculateInterestRate(utilization: number): number {
-  if (utilization <= RATE_MODEL.kink) {
-    return RATE_MODEL.baseRate + (utilization / 100) * RATE_MODEL.multiplier;
-  } else {
-    const baseAtKink = RATE_MODEL.baseRate + (RATE_MODEL.kink / 100) * RATE_MODEL.multiplier;
-    const excessUtilization = (utilization - RATE_MODEL.kink) / 100;
-    return baseAtKink + excessUtilization * RATE_MODEL.jumpMultiplier;
-  }
-}
-
-// Calculate current APR based on utilization (74.2% is below kink, so linear)
-const currentAPR = calculateInterestRate(VAULT_STATS.utilization);
-const avgAPR7d = calculateInterestRate(72.5);  // Mock 7-day average
-const avgAPR30d = calculateInterestRate(68.3); // Mock 30-day average
-
 const INTEREST_RATE_TIERS = [
   { utilization: '0-40%', rate: '10-14.8%', label: 'Low' },
   { utilization: '40-80%', rate: '14.8-19.6%', label: 'Optimal' },
@@ -68,60 +36,144 @@ const INTEREST_RATE_TIERS = [
   { utilization: '85-90%', rate: '24.6-29.6%', label: 'Max Cap' },
 ];
 
-const RECENT_TRANSACTIONS = [
-  { id: 1, type: 'Supply', amount: '+1,000 MIM', time: '2 hours ago', hash: '0x1234...5678' },
-  { id: 2, type: 'Claim', amount: '+45.32 MIM', time: '1 day ago', hash: '0x2345...6789' },
-  { id: 3, type: 'Withdraw', amount: '-500 MIM', time: '3 days ago', hash: '0x3456...7890' },
-];
-
 type Tab = 'Mint' | 'Supply' | 'Positions';
+
+// Hub chain ID (Sonic)
+const HUB_CHAIN_ID = 146;
 
 // Exported as USDWPage for backwards compatibility (displays as MIM/MagicPool in UI)
 export function USDWPage() {
-  const { isConnected, address } = useAccount();
+  const { isConnected, address, chainId } = useAccount();
+  const { switchChain } = useSwitchChain();
   const [activeTab, setActiveTab] = useState<Tab>('Mint');
   
   // Mint state
   const [mintAmount, setMintAmount] = useState('');
   const [isMinting, setIsMinting] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
   
   // Supply state
   const [supplyAmount, setSupplyAmount] = useState('');
   const [isSupplying, setIsSupplying] = useState(false);
   const [supplyMode, setSupplyMode] = useState<'supply' | 'withdraw'>('supply');
-  
-  // Mock balances
-  const usdcBalance = '25,000.00';
-  const mimBalance = MOCK_USER_POSITIONS.mimBalance;
-  const smimBalance = MOCK_USER_POSITIONS.smimBalance;
+
+  // Hook into real contracts
+  const { minter, vault, refetchAll } = useMagicPool();
+
+  // Check if on correct chain
+  const isOnHubChain = chainId === HUB_CHAIN_ID;
+
+  // Format numbers for display
+  const formatNumber = (value: string | number, decimals = 2) => {
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(num)) return '0.00';
+    return num.toLocaleString(undefined, { 
+      minimumFractionDigits: decimals, 
+      maximumFractionDigits: decimals 
+    });
+  };
+
+  // Calculate current APR based on real utilization
+  const currentAPR = vault.interestRate || RATE_MODEL.baseRate;
+  const utilization = vault.utilization || 0;
 
   const mintUsdValue = useMemo(() => {
     const amount = parseFloat(mintAmount.replace(/,/g, '') || '0');
-    return `$${amount.toFixed(2)}`;
+    return `$${formatNumber(amount)}`;
   }, [mintAmount]);
 
   const supplyUsdValue = useMemo(() => {
     const amount = parseFloat(supplyAmount.replace(/,/g, '') || '0');
-    return `$${amount.toFixed(2)}`;
+    return `$${formatNumber(amount)}`;
   }, [supplyAmount]);
 
-  const handleMint = async () => {
-    if (!mintAmount || parseFloat(mintAmount) <= 0) return;
-    setIsMinting(true);
-    // Simulate transaction
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsMinting(false);
-    setMintAmount('');
+  // Handle chain switch
+  const handleSwitchChain = () => {
+    switchChain?.({ chainId: HUB_CHAIN_ID });
   };
 
-  const handleSupply = async () => {
-    if (!supplyAmount || parseFloat(supplyAmount) <= 0) return;
-    setIsSupplying(true);
-    // Simulate transaction
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsSupplying(false);
-    setSupplyAmount('');
+  // Handle Mint
+  const handleMint = async () => {
+    if (!mintAmount || parseFloat(mintAmount) <= 0 || !isOnHubChain) return;
+    
+    const amountBigInt = parseUnits(mintAmount, 6);
+    
+    try {
+      // Check if approval needed
+      if (minter.needsApproval(amountBigInt)) {
+        setIsApproving(true);
+        await minter.approveSUSDC(amountBigInt * BigInt(2)); // Approve 2x for convenience
+        setIsApproving(false);
+      }
+      
+      setIsMinting(true);
+      await minter.mintMIM(amountBigInt);
+      setMintAmount('');
+      refetchAll();
+    } catch (error) {
+      console.error('Mint failed:', error);
+    } finally {
+      setIsMinting(false);
+      setIsApproving(false);
+    }
   };
+
+  // Handle Redeem
+  const handleRedeem = async () => {
+    if (!mintAmount || parseFloat(mintAmount) <= 0 || !isOnHubChain) return;
+    
+    const amountBigInt = parseUnits(mintAmount, 6);
+    
+    try {
+      setIsMinting(true);
+      await minter.redeemMIM(amountBigInt);
+      setMintAmount('');
+      refetchAll();
+    } catch (error) {
+      console.error('Redeem failed:', error);
+    } finally {
+      setIsMinting(false);
+    }
+  };
+
+  // Handle Supply/Withdraw
+  const handleSupply = async () => {
+    if (!supplyAmount || parseFloat(supplyAmount) <= 0 || !isOnHubChain) return;
+    
+    const amountBigInt = parseUnits(supplyAmount, 6);
+    
+    try {
+      if (supplyMode === 'supply') {
+        // Check if approval needed
+        if (vault.needsApproval(amountBigInt)) {
+          setIsApproving(true);
+          await vault.approveMIM(amountBigInt * BigInt(2)); // Approve 2x for convenience
+          setIsApproving(false);
+        }
+        
+        setIsSupplying(true);
+        await vault.deposit(amountBigInt);
+      } else {
+        setIsSupplying(true);
+        await vault.withdraw(amountBigInt);
+      }
+      
+      setSupplyAmount('');
+      refetchAll();
+    } catch (error) {
+      console.error('Supply/Withdraw failed:', error);
+    } finally {
+      setIsSupplying(false);
+      setIsApproving(false);
+    }
+  };
+
+  // Refetch on mount and when connected
+  useEffect(() => {
+    if (isConnected && isOnHubChain) {
+      refetchAll();
+    }
+  }, [isConnected, isOnHubChain]);
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -136,13 +188,35 @@ export function USDWPage() {
           <h1 className="text-zinc-100 text-2xl">MIM Stablecoin</h1>
           <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 rounded-lg text-sm flex items-center gap-1">
             <Shield className="w-3 h-3" />
-            1:1 USDC Backed
+            1:1 sUSDC Backed
           </span>
         </div>
         <p className="text-zinc-400 max-w-2xl">
-          Mint MIM stablecoins 1:1 with USDC, or supply to the StakingVault to earn yield from protocol lending fees.
+          Mint MIM stablecoins 1:1 with sUSDC, or supply to the StakingVault to earn yield from protocol lending fees.
         </p>
       </motion.div>
+
+      {/* Chain Warning */}
+      {isConnected && !isOnHubChain && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-yellow-500" />
+              <span className="text-yellow-500">Please switch to Sonic chain to use MagicPool</span>
+            </div>
+            <button
+              onClick={handleSwitchChain}
+              className="px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black rounded-lg transition-colors"
+            >
+              Switch to Sonic
+            </button>
+          </div>
+        </motion.div>
+      )}
 
       {/* Stats Cards */}
       <motion.div
@@ -156,14 +230,14 @@ export function USDWPage() {
             <PiggyBank className="w-4 h-4" />
             Total Supplied
           </div>
-          <div className="text-zinc-100 text-xl">{VAULT_STATS.totalSupplied}</div>
+          <div className="text-zinc-100 text-xl">${formatNumber(vault.totalAssets)}</div>
         </div>
         <div className="p-4 bg-zinc-900/30 rounded-xl">
           <div className="flex items-center gap-2 text-zinc-500 text-sm mb-2">
             <Wallet className="w-4 h-4" />
             Total Borrowed
           </div>
-          <div className="text-zinc-100 text-xl">{VAULT_STATS.totalBorrowed}</div>
+          <div className="text-zinc-100 text-xl">${formatNumber(vault.totalBorrowed)}</div>
         </div>
         <div className="p-4 bg-zinc-900/30 rounded-xl">
           <div className="flex items-center gap-2 text-zinc-500 text-sm mb-2">
@@ -171,8 +245,8 @@ export function USDWPage() {
             Utilization
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-zinc-100 text-xl">{VAULT_STATS.utilizationDisplay}</span>
-            <span className="text-zinc-500 text-sm">/ {VAULT_STATS.maxUtilization}% max</span>
+            <span className="text-zinc-100 text-xl">{formatNumber(utilization, 1)}%</span>
+            <span className="text-zinc-500 text-sm">/ {MAX_UTILIZATION}% max</span>
           </div>
         </div>
         <div className="p-4 bg-zinc-900/30 rounded-xl border border-emerald-500/20">
@@ -180,7 +254,7 @@ export function USDWPage() {
             <TrendingUp className="w-4 h-4 text-emerald-400" />
             Current APR
           </div>
-          <div className="text-emerald-400 text-xl font-medium">{currentAPR.toFixed(2)}%</div>
+          <div className="text-emerald-400 text-xl font-medium">{formatNumber(currentAPR, 2)}%</div>
         </div>
       </motion.div>
 
@@ -208,7 +282,7 @@ export function USDWPage() {
                 {tab}
                 {activeTab === tab && (
                   <motion.div
-                    layoutId="usdwActiveTab"
+                    layoutId="magicpoolActiveTab"
                     className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-100"
                   />
                 )}
@@ -236,18 +310,18 @@ export function USDWPage() {
                     </div>
                   </div>
 
-                  {/* From USDC */}
+                  {/* From sUSDC */}
                   <div className="mb-2">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-zinc-500">You deposit</span>
-                      <span className="text-zinc-500">Balance: {usdcBalance}</span>
+                      <span className="text-zinc-500">Balance: {formatNumber(minter.sUSDCBalance)} sUSDC</span>
                     </div>
                     <div className="flex items-center gap-3 pb-3 border-b border-zinc-700">
                       <div className="flex items-center gap-2 px-3 py-2 bg-zinc-800 rounded-lg">
                         <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
                           $
                         </div>
-                        <span className="text-zinc-100">USDC</span>
+                        <span className="text-zinc-100">sUSDC</span>
                       </div>
                       <div className="flex-1 flex items-center gap-2">
                         <input
@@ -263,7 +337,7 @@ export function USDWPage() {
                           className="flex-1 bg-transparent text-zinc-100 text-right outline-none placeholder:text-zinc-700"
                         />
                         <button
-                          onClick={() => setMintAmount(usdcBalance.replace(/,/g, ''))}
+                          onClick={() => setMintAmount(minter.sUSDCBalance.replace(/,/g, ''))}
                           className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300 transition-colors text-sm"
                         >
                           MAX
@@ -288,12 +362,12 @@ export function USDWPage() {
                   <div className="mb-6">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-zinc-500">You receive</span>
-                      <span className="text-zinc-500">Balance: {mimBalance}</span>
+                      <span className="text-zinc-500">Balance: {formatNumber(minter.mimBalance)} MIM</span>
                     </div>
                     <div className="flex items-center gap-3 pb-3 border-b border-zinc-700">
                       <div className="flex items-center gap-2 px-3 py-2 bg-zinc-800 rounded-lg">
                         <div className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-xs font-bold">
-                          W
+                          M
                         </div>
                         <span className="text-zinc-100">MIM</span>
                       </div>
@@ -312,8 +386,8 @@ export function USDWPage() {
                     <div className="flex items-start gap-3">
                       <Info className="w-4 h-4 text-zinc-500 mt-0.5" />
                       <div className="text-sm text-zinc-400">
-                        MIM is minted 1:1 with USDC. Your USDC is deposited into the protocol&apos;s 
-                        liquidity layer and can be redeemed at any time.
+                        MIM is minted 1:1 with sUSDC. Your sUSDC is deposited into the MIM/sUSDC V3 pool 
+                        in a tight range (0.995-1.005) to maintain the peg.
                       </div>
                     </div>
                   </div>
@@ -321,11 +395,20 @@ export function USDWPage() {
                   <motion.button
                     whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.99 }}
-                    disabled={!isConnected || !mintAmount || parseFloat(mintAmount) <= 0 || isMinting}
+                    disabled={!isConnected || !isOnHubChain || !mintAmount || parseFloat(mintAmount) <= 0 || isMinting || isApproving}
                     onClick={handleMint}
-                    className="w-full py-4 bg-zinc-100 hover:bg-white text-zinc-950 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg"
+                    className="w-full py-4 bg-zinc-100 hover:bg-white text-zinc-950 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2"
                   >
-                    {!isConnected ? 'Connect Wallet' : isMinting ? 'Minting...' : 'Mint MIM'}
+                    {(isMinting || isApproving) && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {!isConnected 
+                      ? 'Connect Wallet' 
+                      : !isOnHubChain 
+                        ? 'Switch to Sonic'
+                        : isApproving 
+                          ? 'Approving...' 
+                          : isMinting 
+                            ? 'Minting...' 
+                            : 'Mint MIM'}
                   </motion.button>
                 </div>
               )}
@@ -363,7 +446,7 @@ export function USDWPage() {
                     </h3>
                     <div className="flex items-center gap-2 text-emerald-400 text-sm">
                       <TrendingUp className="w-4 h-4" />
-                      {currentAPR.toFixed(2)}% APR
+                      {formatNumber(currentAPR, 2)}% APR
                     </div>
                   </div>
 
@@ -374,13 +457,16 @@ export function USDWPage() {
                         {supplyMode === 'supply' ? 'Amount to supply' : 'Amount to withdraw'}
                       </span>
                       <span className="text-zinc-500">
-                        Balance: {supplyMode === 'supply' ? mimBalance : smimBalance}
+                        Balance: {supplyMode === 'supply' 
+                          ? formatNumber(minter.mimBalance) + ' MIM'
+                          : formatNumber(vault.sMIMBalance) + ' sMIM'
+                        }
                       </span>
                     </div>
                     <div className="flex items-center gap-3 pb-3 border-b border-zinc-700">
                       <div className="flex items-center gap-2 px-3 py-2 bg-zinc-800 rounded-lg">
                         <div className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-xs font-bold">
-                          {supplyMode === 'supply' ? 'W' : 'S'}
+                          {supplyMode === 'supply' ? 'M' : 'S'}
                         </div>
                         <span className="text-zinc-100">
                           {supplyMode === 'supply' ? 'MIM' : 'sMIM'}
@@ -401,7 +487,7 @@ export function USDWPage() {
                         />
                         <button
                           onClick={() => setSupplyAmount(
-                            (supplyMode === 'supply' ? mimBalance : smimBalance).replace(/,/g, '')
+                            (supplyMode === 'supply' ? minter.mimBalance : vault.sMIMBalance).replace(/,/g, '')
                           )}
                           className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300 transition-colors text-sm"
                         >
@@ -426,7 +512,7 @@ export function USDWPage() {
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-zinc-500">Estimated yearly earnings</span>
                         <span className="text-emerald-400">
-                          +${(parseFloat(supplyAmount.replace(/,/g, '') || '0') * (currentAPR / 100)).toFixed(2)}
+                          +${formatNumber(parseFloat(supplyAmount.replace(/,/g, '') || '0') * (currentAPR / 100))}
                         </span>
                       </div>
                     </div>
@@ -438,7 +524,7 @@ export function USDWPage() {
                       <Info className="w-4 h-4 text-zinc-500 mt-0.5" />
                       <div className="text-sm text-zinc-400">
                         {supplyMode === 'supply' 
-                          ? 'sMIM is an interest-bearing token. Its value increases over time as the vault earns lending fees from leverage markets.'
+                          ? 'sMIM is an interest-bearing token. Its value increases over time as the vault earns lending fees from Zero IL vaults.'
                           : 'Withdraw your sMIM to receive MIM plus accumulated interest. No lock-up period required.'
                         }
                       </div>
@@ -448,15 +534,20 @@ export function USDWPage() {
                   <motion.button
                     whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.99 }}
-                    disabled={!isConnected || !supplyAmount || parseFloat(supplyAmount) <= 0 || isSupplying}
+                    disabled={!isConnected || !isOnHubChain || !supplyAmount || parseFloat(supplyAmount) <= 0 || isSupplying || isApproving}
                     onClick={handleSupply}
-                    className="w-full py-4 bg-zinc-100 hover:bg-white text-zinc-950 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg"
+                    className="w-full py-4 bg-zinc-100 hover:bg-white text-zinc-950 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2"
                   >
+                    {(isSupplying || isApproving) && <Loader2 className="w-4 h-4 animate-spin" />}
                     {!isConnected 
                       ? 'Connect Wallet' 
-                      : isSupplying 
-                        ? (supplyMode === 'supply' ? 'Supplying...' : 'Withdrawing...')
-                        : (supplyMode === 'supply' ? 'Supply MIM' : 'Withdraw sMIM')
+                      : !isOnHubChain
+                        ? 'Switch to Sonic'
+                        : isApproving
+                          ? 'Approving...'
+                          : isSupplying 
+                            ? (supplyMode === 'supply' ? 'Supplying...' : 'Withdrawing...')
+                            : (supplyMode === 'supply' ? 'Supply MIM' : 'Withdraw sMIM')
                     }
                   </motion.button>
                 </div>
@@ -469,20 +560,20 @@ export function USDWPage() {
                   <div className="p-6 bg-zinc-900/30 rounded-xl">
                     <h3 className="text-zinc-100 mb-6">Your Position</h3>
                     
-                    {isConnected ? (
+                    {isConnected && isOnHubChain ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* MIM Balance */}
                         <div className="p-4 bg-zinc-800/30 rounded-lg">
                           <div className="flex items-center gap-3 mb-4">
                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-bold">
-                              W
+                              M
                             </div>
                             <div>
                               <div className="text-zinc-500 text-sm">MIM Balance</div>
-                              <div className="text-zinc-100 text-xl">{MOCK_USER_POSITIONS.mimBalance}</div>
+                              <div className="text-zinc-100 text-xl">{formatNumber(minter.mimBalance)}</div>
                             </div>
                           </div>
-                          <div className="text-zinc-500 text-sm">≈ ${MOCK_USER_POSITIONS.mimBalance}</div>
+                          <div className="text-zinc-500 text-sm">≈ ${formatNumber(minter.mimBalance)}</div>
                         </div>
 
                         {/* sMIM Balance */}
@@ -493,94 +584,45 @@ export function USDWPage() {
                             </div>
                             <div>
                               <div className="text-zinc-500 text-sm">sMIM (Staked)</div>
-                              <div className="text-zinc-100 text-xl">{MOCK_USER_POSITIONS.smimBalance}</div>
+                              <div className="text-zinc-100 text-xl">{formatNumber(vault.sMIMBalance)}</div>
                             </div>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-zinc-500 text-sm">Value: ${MOCK_USER_POSITIONS.smimValue}</span>
+                            <span className="text-zinc-500 text-sm">Value: ${formatNumber(vault.sMIMBalance)}</span>
                             <span className="text-emerald-400 text-sm flex items-center gap-1">
-                              <ArrowUpRight className="w-3 h-3" />
-                              +$256.20
+                              <TrendingUp className="w-3 h-3" />
+                              {formatNumber(currentAPR, 1)}% APR
                             </span>
                           </div>
                         </div>
                       </div>
                     ) : (
                       <div className="text-center py-8">
-                        <div className="text-zinc-500 mb-4">Connect your wallet to view positions</div>
+                        <div className="text-zinc-500 mb-4">
+                          {!isConnected ? 'Connect your wallet to view positions' : 'Switch to Sonic chain'}
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  {/* Earnings */}
-                  {isConnected && (
+                  {/* Vault Stats */}
+                  {isConnected && isOnHubChain && (
                     <div className="p-6 bg-zinc-900/30 rounded-xl">
-                      <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-zinc-100">Earnings</h3>
-                        <button className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg transition-colors">
-                          Claim Rewards
-                        </button>
-                      </div>
+                      <h3 className="text-zinc-100 mb-6">Vault Statistics</h3>
                       
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="p-4 bg-zinc-800/30 rounded-lg">
-                          <div className="text-zinc-500 text-sm mb-2">Pending Rewards</div>
-                          <div className="text-emerald-400 text-xl">${MOCK_USER_POSITIONS.pendingRewards}</div>
+                          <div className="text-zinc-500 text-sm mb-2">Total Interest Earned</div>
+                          <div className="text-emerald-400 text-xl">${formatNumber(vault.totalInterestEarned)}</div>
                         </div>
                         <div className="p-4 bg-zinc-800/30 rounded-lg">
-                          <div className="text-zinc-500 text-sm mb-2">Total Earned</div>
-                          <div className="text-zinc-100 text-xl">${MOCK_USER_POSITIONS.totalEarned}</div>
+                          <div className="text-zinc-500 text-sm mb-2">Available Liquidity</div>
+                          <div className="text-zinc-100 text-xl">${formatNumber(vault.availableLiquidity)}</div>
                         </div>
                         <div className="p-4 bg-zinc-800/30 rounded-lg">
                           <div className="text-zinc-500 text-sm mb-2">Your APR</div>
-                          <div className="text-zinc-100 text-xl">{currentAPR.toFixed(2)}%</div>
+                          <div className="text-zinc-100 text-xl">{formatNumber(currentAPR, 2)}%</div>
                         </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Recent Transactions */}
-                  {isConnected && (
-                    <div className="p-6 bg-zinc-900/30 rounded-xl">
-                      <h3 className="text-zinc-100 mb-4">Recent Transactions</h3>
-                      
-                      <div className="space-y-3">
-                        {RECENT_TRANSACTIONS.map((tx, index) => (
-                          <motion.div
-                            key={tx.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.05 }}
-                            className="flex items-center justify-between p-3 bg-zinc-800/30 rounded-lg hover:bg-zinc-800/50 transition-colors"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                                tx.type === 'Supply' 
-                                  ? 'bg-emerald-500/10 text-emerald-400'
-                                  : tx.type === 'Claim'
-                                    ? 'bg-blue-500/10 text-blue-400'
-                                    : 'bg-zinc-700 text-zinc-400'
-                              }`}>
-                                {tx.type === 'Supply' && <ArrowDown className="w-4 h-4" />}
-                                {tx.type === 'Claim' && <TrendingUp className="w-4 h-4" />}
-                                {tx.type === 'Withdraw' && <ArrowUpRight className="w-4 h-4" />}
-                              </div>
-                              <div>
-                                <div className="text-zinc-100">{tx.type}</div>
-                                <div className="text-zinc-500 text-sm">{tx.hash}</div>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className={tx.amount.startsWith('+') ? 'text-emerald-400' : 'text-zinc-400'}>
-                                {tx.amount}
-                              </div>
-                              <div className="text-zinc-500 text-sm flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {tx.time}
-                              </div>
-                            </div>
-                          </motion.div>
-                        ))}
                       </div>
                     </div>
                   )}
@@ -598,7 +640,7 @@ export function USDWPage() {
           className="space-y-6"
         >
           {/* Max Utilization Warning */}
-          {VAULT_STATS.utilization >= 85 && (
+          {utilization >= 85 && (
             <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
@@ -663,7 +705,7 @@ export function USDWPage() {
             <div className="mt-6">
               <div className="flex items-center justify-between text-sm mb-2">
                 <span className="text-zinc-500">Current Utilization</span>
-                <span className="text-zinc-100">{VAULT_STATS.utilizationDisplay} / {MAX_UTILIZATION}%</span>
+                <span className="text-zinc-100">{formatNumber(utilization, 1)}% / {MAX_UTILIZATION}%</span>
               </div>
               <div className="relative h-3 bg-zinc-800 rounded-full overflow-hidden">
                 {/* 80% kink point indicator */}
@@ -678,39 +720,19 @@ export function USDWPage() {
                 />
                 <div 
                   className={`h-full transition-all ${
-                    VAULT_STATS.utilization >= RATE_MODEL.kink 
+                    utilization >= RATE_MODEL.kink 
                       ? 'bg-gradient-to-r from-emerald-500 via-yellow-500 to-red-500' 
-                      : VAULT_STATS.utilization >= 60
+                      : utilization >= 60
                         ? 'bg-gradient-to-r from-emerald-500 to-yellow-400'
                         : 'bg-emerald-500'
                   }`}
-                  style={{ width: `${(VAULT_STATS.utilization / MAX_UTILIZATION) * 100}%` }}
+                  style={{ width: `${(utilization / MAX_UTILIZATION) * 100}%` }}
                 />
               </div>
               <div className="flex items-center justify-between text-xs mt-1">
                 <span className="text-zinc-600">0%</span>
                 <span className="text-yellow-400/70">{RATE_MODEL.kink}% kink</span>
                 <span className="text-red-400/70">{MAX_UTILIZATION}% cap</span>
-              </div>
-            </div>
-          </div>
-
-          {/* APR History */}
-          <div className="p-6 bg-zinc-900/30 rounded-xl">
-            <h3 className="text-zinc-100 mb-4">APR History</h3>
-            
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-zinc-500">Current</span>
-                <span className="text-emerald-400">{currentAPR.toFixed(2)}%</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-zinc-500">7-day Avg</span>
-                <span className="text-zinc-100">{avgAPR7d.toFixed(2)}%</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-zinc-500">30-day Avg</span>
-                <span className="text-zinc-100">{avgAPR30d.toFixed(2)}%</span>
               </div>
             </div>
           </div>
@@ -724,7 +746,7 @@ export function USDWPage() {
                 <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-300 text-xs flex-shrink-0">
                   1
                 </div>
-                <p>Mint MIM 1:1 with USDC through the protocol</p>
+                <p>Mint MIM 1:1 with sUSDC through the protocol</p>
               </div>
               <div className="flex items-start gap-3">
                 <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-300 text-xs flex-shrink-0">
@@ -736,7 +758,7 @@ export function USDWPage() {
                 <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-300 text-xs flex-shrink-0">
                   3
                 </div>
-                <p>Earn yield from protocol lending fees automatically</p>
+                <p>sMIM earns yield from Zero IL vault borrowing fees</p>
               </div>
               <div className="flex items-start gap-3">
                 <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-300 text-xs flex-shrink-0">
@@ -761,4 +783,3 @@ export function USDWPage() {
     </div>
   );
 }
-
