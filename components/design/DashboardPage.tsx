@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from 'react';
-import { TrendingUp, ArrowUpRight, ArrowDownRight, Info } from 'lucide-react';
+import { TrendingUp, ArrowUpRight, ArrowDownRight, Info, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useAllZeroILVaults } from '@/lib/contracts/magicpool/useZeroILVault';
+import { useMIMStaking } from '@/lib/contracts/0IL/use0IL';
+import { useRouter } from 'next/navigation';
 
 const LEVERAGED_POSITIONS = [
   {
@@ -49,10 +52,15 @@ const LEVERAGE_LIQUIDITY_POSITIONS = [
   { id: 2, name: 'WS/USDC.e', supplied: '$2,800', earned: '$95', apr: '87.6%' },
 ];
 
-type PortfolioTab = 'GMI' | 'Strategies' | 'V3 Pools' | 'Leverage Liquidity';
+type PortfolioTab = 'GMI' | 'Strategies' | 'V3 Pools' | 'Zero IL Vaults' | 'Leverage Liquidity';
 
 export function DashboardPage() {
   const [activePortfolioTab, setActivePortfolioTab] = useState<PortfolioTab>('GMI');
+  const router = useRouter();
+  
+  // Real Zero IL vault data
+  const { wethVault, wbtcVault } = useAllZeroILVaults();
+  const { balance: sMIMBalance, totalAssets: sMIMTotalAssets } = useMIMStaking();
 
   const tradingBalance = LEVERAGED_POSITIONS.reduce((sum, pos) => {
     const size = parseFloat(pos.size.replace(/[$,]/g, ''));
@@ -76,6 +84,11 @@ export function DashboardPage() {
     V3_POSITIONS.forEach(pos => {
       total += parseFloat(pos.liquidity.replace(/[$,]/g, ''));
     });
+    
+    // Zero IL Vaults - real data
+    const wethValue = parseFloat(wethVault.wTokenBalance || '0') * wethVault.assetPrice;
+    const sMIMValue = parseFloat(sMIMBalance || '0'); // sMIM = $1
+    total += wethValue + sMIMValue;
     
     // Leverage liquidity positions
     LEVERAGE_LIQUIDITY_POSITIONS.forEach(pos => {
@@ -189,7 +202,7 @@ export function DashboardPage() {
 
         {/* Portfolio Tabs */}
         <div className="flex items-center gap-6 mb-6 border-b border-zinc-800">
-          {(['GMI', 'Strategies', 'V3 Pools', 'Leverage Liquidity'] as PortfolioTab[]).map((tab) => (
+          {(['GMI', 'Strategies', 'V3 Pools', 'Zero IL Vaults', 'Leverage Liquidity'] as PortfolioTab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActivePortfolioTab(tab)}
@@ -481,6 +494,132 @@ export function DashboardPage() {
                 </div>
               </motion.div>
             ))}
+          </div>
+        )}
+
+        {activePortfolioTab === 'Zero IL Vaults' && (
+          <div className="space-y-6">
+            {/* Zero IL Vaults Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-zinc-900/30 rounded-lg">
+                <div className="text-zinc-500 text-sm mb-1">Total Deposited</div>
+                <div className="text-zinc-100 text-xl">
+                  ${((parseFloat(wethVault.wTokenBalance || '0') * wethVault.assetPrice) + parseFloat(sMIMBalance || '0')).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div className="p-4 bg-zinc-900/30 rounded-lg">
+                <div className="text-zinc-500 text-sm mb-1">sWETH Price</div>
+                <div className="text-zinc-100 text-xl">${wethVault.assetPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              </div>
+              <div className="p-4 bg-zinc-900/30 rounded-lg">
+                <div className="text-zinc-500 text-sm mb-1">sMIM TVL</div>
+                <div className="text-zinc-100 text-xl">${parseFloat(sMIMTotalAssets || '0').toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              </div>
+            </div>
+
+            {/* wETH Vault Position */}
+            {parseFloat(wethVault.wTokenBalance || '0') > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="p-6 bg-zinc-900/30 rounded-lg hover:bg-zinc-900/50 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
+                      <Shield className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <div className="text-zinc-100 flex items-center gap-2">
+                        wETH (Zero IL)
+                        <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded">2x Leverage</span>
+                      </div>
+                      <div className="text-zinc-500 text-sm">Zero Impermanent Loss ETH exposure</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-8">
+                    <div className="text-right">
+                      <div className="text-zinc-500 text-sm mb-1">Balance</div>
+                      <div className="text-zinc-100">{parseFloat(wethVault.wTokenBalance || '0').toFixed(6)} wETH</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-zinc-500 text-sm mb-1">Value</div>
+                      <div className="text-zinc-100">${(parseFloat(wethVault.wTokenBalance || '0') * wethVault.assetPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-zinc-500 text-sm mb-1">APR</div>
+                      <div className="text-green-400">{wethVault.apr}%</div>
+                    </div>
+                    <button 
+                      onClick={() => router.push('/magicpool')}
+                      className="px-6 py-2 border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-zinc-100 rounded-lg transition-all"
+                    >
+                      Manage
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* sMIM Position */}
+            {parseFloat(sMIMBalance || '0') > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.05 }}
+                className="p-6 bg-zinc-900/30 rounded-lg hover:bg-zinc-900/50 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center">
+                      <span className="text-white font-bold text-sm">M</span>
+                    </div>
+                    <div>
+                      <div className="text-zinc-100 flex items-center gap-2">
+                        sMIM (Staked MIM)
+                        <span className="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded">Yield Bearing</span>
+                      </div>
+                      <div className="text-zinc-500 text-sm">Earn from 0IL vault borrow interest</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-8">
+                    <div className="text-right">
+                      <div className="text-zinc-500 text-sm mb-1">Balance</div>
+                      <div className="text-zinc-100">{parseFloat(sMIMBalance || '0').toFixed(4)} sMIM</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-zinc-500 text-sm mb-1">Value</div>
+                      <div className="text-zinc-100">${parseFloat(sMIMBalance || '0').toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-zinc-500 text-sm mb-1">APR</div>
+                      <div className="text-green-400">~5%</div>
+                    </div>
+                    <button 
+                      onClick={() => router.push('/magicpool')}
+                      className="px-6 py-2 border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-zinc-100 rounded-lg transition-all"
+                    >
+                      Manage
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Empty state */}
+            {parseFloat(wethVault.wTokenBalance || '0') === 0 && parseFloat(sMIMBalance || '0') === 0 && (
+              <div className="p-12 bg-zinc-900/20 rounded-lg text-center">
+                <Shield className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
+                <div className="text-zinc-400 mb-4">No Zero IL vault positions yet</div>
+                <button 
+                  onClick={() => router.push('/magicpool')}
+                  className="px-6 py-3 bg-zinc-100 hover:bg-white text-zinc-950 rounded-lg transition-all"
+                >
+                  Explore Zero IL Vaults
+                </button>
+              </div>
+            )}
           </div>
         )}
 
