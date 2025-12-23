@@ -20,15 +20,15 @@ export const CHAIN_CONFIG = {
       swapRouter: "0x8BbF9fF8CE8060B85DFe48d7b7E897d09418De9B",
       nonfungiblePositionManager: "0x5826e10B513C891910032F15292B2F1b3041C3Df",
       quoterV2: "0x57e3e0a9DfB3DA34cc164B2C8dD1EBc404c45d47",
-      // 0IL Protocol v6 Contracts (correct sUSDC + correct pool with new MIM)
-      mim: "0x84dC0B4EA2f302CCbDe37cFC6a4C434e0Fd08708", // MIM stablecoin (18 decimals)
-      stakingVault: "0x4671B3F169Daee1eC027d60B484ce4fb98cF7db7", // sMIM vault (v2 - with new MIM)
-      mimUsdcPool: "0xFBfb4e7DE02EFfd36c9A307340a6a0AdCd01663B", // MIM/sUSDC peg pool (0.01% fee)
-      swethMimPool: "0x4ed3B3e2AD7e19124D921fE2F6956e1C62Cbf190", // sWETH/MIM pool (0.05% fee)
-      oracleAdapter: "0xD8680463F66C7bF74C61A2660aF4d7094ee9F749", // SimpleOracle
-      v3LPVault: "0x1139d155D39b2520047178444C51D3D70204650F",
-      leverageAMM: "0x8CA24d00ffcF60e9ba7F67F9d41ccA28E22dF508",
-      wETH: "0xEA7681f28c62AbF83DeD17eEd88D48b3BD813Af7", // Zero-IL wETH token (v9)
+      // 0IL Protocol V2 Contracts (working - with TestMIM + repayDirect fix)
+      mim: "0x9dEb5301967DD118D9F37181EB971d1136a72635", // TestMIM (18 decimals) - owner can mint
+      stakingVault: "0xdeF5851B6C14559c47bf7cC98BACBeC9D31eb968", // MIMStakingVaultV2 (with repayDirect)
+      mimUsdcPool: "0xFBfb4e7DE02EFfd36c9A307340a6a0AdCd01663B", // MIM/sUSDC peg pool (0.01% fee) - old MIM
+      swethMimPool: "0xf86E66E4FC1BB30594b9B2134175529fC075d3b1", // sWETH/TestMIM pool (0.01% fee, correct price)
+      oracleAdapter: "0xf50e13ec9Aa9378B61eAdB5F62EFA69E36de8335", // SimpleOracle (3000 MIM/sWETH)
+      v3LPVault: "0x39a94051A61de1F7293505974F8e39A61010D9c4", // V3LPVault V2
+      leverageAMM: "0x033eD8e35b5334F69c2Fc50072926F4140925973", // LeverageAMMV2 (with repayDirect)
+      wETH: "0xbEd139f379B85B68f44EEd84d519d6608C090361", // Zero-IL wETH token V2
     },
     nativeCurrency: {
       name: "Sonic",

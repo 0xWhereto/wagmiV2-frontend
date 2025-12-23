@@ -139,16 +139,16 @@ export const SONIC_TOKENS: Token[] = [
     tags: ['synthetic'],
     coingeckoId: 'wrapped-bitcoin', // Use WBTC price
   }),
-  // 0IL Protocol v6 Tokens (correct sUSDC + correct pool)
-  createToken(146, '0x84dC0B4EA2f302CCbDe37cFC6a4C434e0Fd08708', 'MIM', 'Magic Internet Money', 18, { 
+  // 0IL Protocol V2 Tokens (working with TestMIM + repayDirect fix)
+  createToken(146, '0x9dEb5301967DD118D9F37181EB971d1136a72635', 'MIM', 'Magic Internet Money', 18, { 
     tags: ['stablecoin', '0IL'],
     coingeckoId: 'usd-coin', // Track 1:1 with USD
   }),
-  createToken(146, '0x4671B3F169Daee1eC027d60B484ce4fb98cF7db7', 'sMIM', 'Staked MIM', 18, {
+  createToken(146, '0xdeF5851B6C14559c47bf7cC98BACBeC9D31eb968', 'sMIM', 'Staked MIM', 18, {
     tags: ['stablecoin', '0IL', 'staked'],
     coingeckoId: 'usd-coin', // Track 1:1 with USD
   }),
-  createToken(146, '0xEA7681f28c62AbF83DeD17eEd88D48b3BD813Af7', 'wETH', 'Zero-IL Wrapped ETH', 18, { 
+  createToken(146, '0xbEd139f379B85B68f44EEd84d519d6608C090361', 'wETH', 'Zero-IL Wrapped ETH', 18, { 
     tags: ['0IL', 'leveraged'],
     coingeckoId: 'weth', // Track ETH price 1:1
   }),

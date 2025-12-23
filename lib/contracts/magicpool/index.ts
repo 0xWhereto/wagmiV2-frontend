@@ -2,15 +2,15 @@
 // Updated to v4 deployment
 
 export const MAGICPOOL_ADDRESSES = {
-  // Core 0IL Contracts (v6 - correct sUSDC + correct pool with new MIM)
-  mimToken: "0x84dC0B4EA2f302CCbDe37cFC6a4C434e0Fd08708" as `0x${string}`, // MIM stablecoin (18 decimals)
-  stakingVault: "0x4671B3F169Daee1eC027d60B484ce4fb98cF7db7" as `0x${string}`, // sMIM vault (v2)
-  mimUsdcPool: "0xFBfb4e7DE02EFfd36c9A307340a6a0AdCd01663B" as `0x${string}`, // MIM/sUSDC peg pool (0.01% fee)
-  swethMimPool: "0x4ed3B3e2AD7e19124D921fE2F6956e1C62Cbf190" as `0x${string}`, // sWETH/MIM pool
-  oracleAdapter: "0xD8680463F66C7bF74C61A2660aF4d7094ee9F749" as `0x${string}`, // SimpleOracle
-  v3LPVault: "0x1139d155D39b2520047178444C51D3D70204650F" as `0x${string}`,
-  leverageAMM: "0x8CA24d00ffcF60e9ba7F67F9d41ccA28E22dF508" as `0x${string}`,
-  wETH: "0xEA7681f28c62AbF83DeD17eEd88D48b3BD813Af7" as `0x${string}`, // Zero-IL wETH (v9)
+  // Core 0IL Contracts V2 (working - with TestMIM + repayDirect fix)
+  mimToken: "0x9dEb5301967DD118D9F37181EB971d1136a72635" as `0x${string}`, // TestMIM (18 decimals)
+  stakingVault: "0xdeF5851B6C14559c47bf7cC98BACBeC9D31eb968" as `0x${string}`, // MIMStakingVaultV2
+  mimUsdcPool: "0xFBfb4e7DE02EFfd36c9A307340a6a0AdCd01663B" as `0x${string}`, // MIM/sUSDC peg pool (old MIM)
+  swethMimPool: "0xf86E66E4FC1BB30594b9B2134175529fC075d3b1" as `0x${string}`, // sWETH/TestMIM pool (correct)
+  oracleAdapter: "0xf50e13ec9Aa9378B61eAdB5F62EFA69E36de8335" as `0x${string}`, // SimpleOracle
+  v3LPVault: "0x39a94051A61de1F7293505974F8e39A61010D9c4" as `0x${string}`, // V3LPVault V2
+  leverageAMM: "0x033eD8e35b5334F69c2Fc50072926F4140925973" as `0x${string}`, // LeverageAMMV2
+  wETH: "0xbEd139f379B85B68f44EEd84d519d6608C090361" as `0x${string}`, // Zero-IL wETH V2
   
   // Underlying synthetic tokens
   sUSDC: "0xa56a2C5678f8e10F61c6fBafCB0887571B9B432B" as `0x${string}`, // Synthetic sUSDC from Hub
