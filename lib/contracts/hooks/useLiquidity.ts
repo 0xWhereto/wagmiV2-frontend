@@ -48,6 +48,10 @@ export interface MintParams {
   amount1Desired: bigint;
   amount0Min: bigint;
   amount1Min: bigint;
+  // Optional: for creating new pools
+  initialPrice?: number;
+  token0Decimals?: number;
+  token1Decimals?: number;
 }
 
 export interface PoolInfo {
@@ -414,8 +418,9 @@ export function useLiquidity() {
   }, [address, publicClient, writeContractAsync]);
 
   // Add liquidity (mint new position)
+  // If initialPrice is provided and pool doesn't exist, creates the pool first
   const addLiquidity = useCallback(async (params: MintParams): Promise<`0x${string}` | null> => {
-    if (!address || !walletClient || POSITION_MANAGER === "0x0000000000000000000000000000000000000000") {
+    if (!address || !walletClient || !publicClient || POSITION_MANAGER === "0x0000000000000000000000000000000000000000") {
       setError("Wallet not connected or contracts not configured");
       return null;
     }
@@ -431,14 +436,57 @@ export function useLiquidity() {
       let amount1Desired = params.amount1Desired;
       let amount0Min = params.amount0Min;
       let amount1Min = params.amount1Min;
+      let initialPrice = params.initialPrice;
+      let token0Decimals = params.token0Decimals || 18;
+      let token1Decimals = params.token1Decimals || 18;
 
-      if (params.token0.toLowerCase() > params.token1.toLowerCase()) {
+      const needsSwap = params.token0.toLowerCase() > params.token1.toLowerCase();
+      if (needsSwap) {
         token0 = params.token1;
         token1 = params.token0;
         amount0Desired = params.amount1Desired;
         amount1Desired = params.amount0Desired;
         amount0Min = params.amount1Min;
         amount1Min = params.amount0Min;
+        // Invert initial price if tokens are swapped
+        if (initialPrice) {
+          initialPrice = 1 / initialPrice;
+        }
+        // Swap decimals too
+        const tempDecimals = token0Decimals;
+        token0Decimals = token1Decimals;
+        token1Decimals = tempDecimals;
+      }
+
+      // Check if pool exists
+      const poolAddress = await publicClient.readContract({
+        address: FACTORY,
+        abi: UniswapV3FactoryABI,
+        functionName: "getPool",
+        args: [token0, token1, params.fee],
+      }) as `0x${string}`;
+
+      const poolExists = poolAddress && poolAddress !== "0x0000000000000000000000000000000000000000";
+
+      // If pool doesn't exist and we have initial price, create it
+      if (!poolExists && initialPrice) {
+        console.log("Pool doesn't exist, creating with initial price:", initialPrice);
+        
+        const sqrtPriceX96 = priceToSqrtPriceX96(initialPrice, token0Decimals, token1Decimals);
+        console.log("sqrtPriceX96 for new pool:", sqrtPriceX96.toString());
+
+        const createHash = await writeContractAsync({
+          address: POSITION_MANAGER,
+          abi: NonfungiblePositionManagerABI,
+          functionName: "createAndInitializePoolIfNecessary",
+          args: [token0, token1, params.fee, sqrtPriceX96],
+          chainId: HUB_CHAIN_ID,
+        });
+
+        await publicClient.waitForTransactionReceipt({ hash: createHash });
+        console.log("Pool created successfully");
+      } else if (!poolExists && !initialPrice) {
+        throw new Error("Pool doesn't exist and no initial price provided");
       }
 
       // Approve tokens
@@ -475,10 +523,8 @@ export function useLiquidity() {
       });
 
       // Wait for confirmation and refresh positions
-      if (publicClient) {
-        await publicClient.waitForTransactionReceipt({ hash });
-        await fetchPositions();
-      }
+      await publicClient.waitForTransactionReceipt({ hash });
+      await fetchPositions();
 
       return hash;
     } catch (err: any) {

@@ -102,7 +102,7 @@ export function USDWPage() {
       // Check if approval needed
       if (minter.needsApproval(amountBigInt)) {
         setIsApproving(true);
-        await minter.approveSUSDC(amountBigInt * BigInt(2)); // Approve 2x for convenience
+        await minter.approveSUSDC(amountBigInt); // Approve exact amount needed
         setIsApproving(false);
       }
       
@@ -122,7 +122,8 @@ export function USDWPage() {
   const handleRedeem = async () => {
     if (!mintAmount || parseFloat(mintAmount) <= 0 || !isOnHubChain) return;
     
-    const amountBigInt = parseUnits(mintAmount, 6);
+    // When redeeming, user inputs MIM amount (18 decimals)
+    const amountBigInt = parseUnits(mintAmount, 18);
     
     try {
       setIsMinting(true);
@@ -140,14 +141,15 @@ export function USDWPage() {
   const handleSupply = async () => {
     if (!supplyAmount || parseFloat(supplyAmount) <= 0 || !isOnHubChain) return;
     
-    const amountBigInt = parseUnits(supplyAmount, 6);
+    // MIM and sMIM both have 18 decimals
+    const amountBigInt = parseUnits(supplyAmount, 18);
     
     try {
       if (supplyMode === 'supply') {
         // Check if approval needed
         if (vault.needsApproval(amountBigInt)) {
           setIsApproving(true);
-          await vault.approveMIM(amountBigInt * BigInt(2)); // Approve 2x for convenience
+          await vault.approveMIM(amountBigInt); // Approve exact amount needed
           setIsApproving(false);
         }
         

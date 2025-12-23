@@ -18,6 +18,9 @@ export const KNOWN_POOL_PAIRS = [
   { token0Symbol: "sUSDC", token1Symbol: "sUSDT", fees: [100, 500] },
   { token0Symbol: "sWBTC", token1Symbol: "sWETH", fees: [500, 3000] },
   { token0Symbol: "sWBTC", token1Symbol: "sUSDC", fees: [500, 3000] },
+  // MIM pools (0.01% for stablecoin peg, 0.05% for volatile pairs)
+  { token0Symbol: "MIM", token1Symbol: "sUSDC", fees: [100, 500, 3000] }, // 0.01% is the main peg pool
+  { token0Symbol: "MIM", token1Symbol: "sWETH", fees: [100, 500, 3000] },
 ] as const;
 
 // Token prices for TVL calculation (would use oracle in production)
@@ -27,6 +30,8 @@ const TOKEN_PRICES: Record<string, number> = {
   sUSDT: 1,
   sWBTC: 95000,
   sDAI: 1,
+  MIM: 1,
+  sMIM: 1,
 };
 
 export interface PoolData {

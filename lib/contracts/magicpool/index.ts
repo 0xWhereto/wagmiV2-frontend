@@ -1,17 +1,24 @@
-// MagicPool contract addresses and ABIs
+// 0IL Protocol contract addresses and ABIs (deployed to Sonic)
+// Updated to v4 deployment
 
 export const MAGICPOOL_ADDRESSES = {
-  mimToken: "0x2321e7dDdC1aF826E1827Ee41C306f8837656846" as `0x${string}`,
-  mimMinter: "0x38FB72EB47213cC75797249a9daC5CD357F2021c" as `0x${string}`,
-  stakingVault: "0x1880d94b47af6c80BbCa973B383221fD53A6e139" as `0x${string}`,
-  wethZeroILVault: "0x27C42A9184D45A3657b7fEE9cd9969216BAd9CE3" as `0x${string}`,
-  wbtcZeroILVault: "0x1544Dc2A93c148C04dEA54Bd150EBb5BB3948ac2" as `0x${string}`,
-  wethZeroILStrategy: "0x80A13466aE5185d375e5b75b1bA66d47B773858c" as `0x${string}`,
-  wbtcZeroILStrategy: "0xf51Ff777724F8B5Dae8e7BD6295D2d6eA7C89bC8" as `0x${string}`,
-  sUSDC: "0xa56a2C5678f8e10F61c6fBafCB0887571B9B432B" as `0x${string}`,
+  // Core 0IL Contracts (v6 - correct sUSDC + correct pool with new MIM)
+  mimToken: "0x84dC0B4EA2f302CCbDe37cFC6a4C434e0Fd08708" as `0x${string}`, // MIM stablecoin (18 decimals)
+  stakingVault: "0x4671B3F169Daee1eC027d60B484ce4fb98cF7db7" as `0x${string}`, // sMIM vault (v2)
+  mimUsdcPool: "0xFBfb4e7DE02EFfd36c9A307340a6a0AdCd01663B" as `0x${string}`, // MIM/sUSDC peg pool (0.01% fee)
+  swethMimPool: "0x4ed3B3e2AD7e19124D921fE2F6956e1C62Cbf190" as `0x${string}`, // sWETH/MIM pool
+  oracleAdapter: "0xD8680463F66C7bF74C61A2660aF4d7094ee9F749" as `0x${string}`, // SimpleOracle
+  v3LPVault: "0x1139d155D39b2520047178444C51D3D70204650F" as `0x${string}`,
+  leverageAMM: "0x8CA24d00ffcF60e9ba7F67F9d41ccA28E22dF508" as `0x${string}`,
+  wETH: "0xEA7681f28c62AbF83DeD17eEd88D48b3BD813Af7" as `0x${string}`, // Zero-IL wETH (v9)
+  
+  // Underlying synthetic tokens
+  sUSDC: "0xa56a2C5678f8e10F61c6fBafCB0887571B9B432B" as `0x${string}`, // Synthetic sUSDC from Hub
+  sWETH: "0x5E501C482952c1F2D58a4294F9A97759968c5125" as `0x${string}`,
+  sWBTC: "0x20Ca9a180b6ae1f0Ba5B6750F47b1061C49E8aFE" as `0x${string}`,
 } as const;
 
-// MIM Token ABI (simplified)
+// MIM Token ABI (core functions)
 export const MIM_TOKEN_ABI = [
   {
     type: "function",
@@ -54,91 +61,50 @@ export const MIM_TOKEN_ABI = [
     outputs: [{ name: "", type: "uint8" }],
     stateMutability: "view",
   },
-] as const;
-
-// MIM Minter ABI
-export const MIM_MINTER_ABI = [
   {
     type: "function",
-    name: "mint",
-    inputs: [{ name: "_amount", type: "uint256" }],
-    outputs: [{ name: "mimAmount", type: "uint256" }],
+    name: "mintWithUSDC",
+    inputs: [{ name: "amount", type: "uint256" }],
+    outputs: [],
     stateMutability: "nonpayable",
   },
   {
     type: "function",
-    name: "redeem",
-    inputs: [{ name: "_amount", type: "uint256" }],
-    outputs: [{ name: "sUSDCAmount", type: "uint256" }],
+    name: "redeemForUSDC",
+    inputs: [{ name: "mimAmount", type: "uint256" }],
+    outputs: [],
     stateMutability: "nonpayable",
   },
   {
     type: "function",
-    name: "getPoolStats",
-    inputs: [],
-    outputs: [
-      { name: "_totalSUSDCDeposited", type: "uint256" },
-      { name: "_totalMIMMinted", type: "uint256" },
-      { name: "_liquidity", type: "uint128" },
-      { name: "_currentTick", type: "int24" },
-    ],
-    stateMutability: "view",
-  },
-  {
-    type: "function",
-    name: "pool",
-    inputs: [],
-    outputs: [{ name: "", type: "address" }],
-    stateMutability: "view",
-  },
-  {
-    type: "function",
-    name: "totalSUSDCDeposited",
+    name: "totalBacking",
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
   {
     type: "function",
-    name: "totalMIMMinted",
+    name: "backingRatio",
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
 ] as const;
 
-// Staking Vault ABI (ERC4626)
+// MIMStakingVault (sMIM) ABI
 export const STAKING_VAULT_ABI = [
   {
     type: "function",
     name: "deposit",
-    inputs: [
-      { name: "assets", type: "uint256" },
-      { name: "receiver", type: "address" },
-    ],
-    outputs: [{ name: "", type: "uint256" }],
+    inputs: [{ name: "assets", type: "uint256" }],
+    outputs: [{ name: "shares", type: "uint256" }],
     stateMutability: "nonpayable",
   },
   {
     type: "function",
     name: "withdraw",
-    inputs: [
-      { name: "assets", type: "uint256" },
-      { name: "receiver", type: "address" },
-      { name: "owner", type: "address" },
-    ],
-    outputs: [{ name: "", type: "uint256" }],
-    stateMutability: "nonpayable",
-  },
-  {
-    type: "function",
-    name: "redeem",
-    inputs: [
-      { name: "shares", type: "uint256" },
-      { name: "receiver", type: "address" },
-      { name: "owner", type: "address" },
-    ],
-    outputs: [{ name: "", type: "uint256" }],
+    inputs: [{ name: "shares", type: "uint256" }],
+    outputs: [{ name: "assets", type: "uint256" }],
     stateMutability: "nonpayable",
   },
   {
@@ -157,57 +123,50 @@ export const STAKING_VAULT_ABI = [
   },
   {
     type: "function",
-    name: "totalBorrowed",
+    name: "totalBorrows",
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
   {
     type: "function",
-    name: "availableLiquidity",
+    name: "getCash",
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
   {
     type: "function",
-    name: "getUtilization",
+    name: "utilizationRate",
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
   {
     type: "function",
-    name: "getCurrentInterestRate",
+    name: "averageUtilization",
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
   {
     type: "function",
-    name: "getVaultStats",
+    name: "borrowRate",
     inputs: [],
-    outputs: [
-      { name: "_totalAssets", type: "uint256" },
-      { name: "_totalBorrowed", type: "uint256" },
-      { name: "_availableLiquidity", type: "uint256" },
-      { name: "_utilization", type: "uint256" },
-      { name: "_interestRate", type: "uint256" },
-      { name: "_totalInterestEarned", type: "uint256" },
-    ],
+    outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
   {
     type: "function",
-    name: "previewDeposit",
+    name: "supplyRate",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "convertToShares",
     inputs: [{ name: "assets", type: "uint256" }],
-    outputs: [{ name: "", type: "uint256" }],
-    stateMutability: "view",
-  },
-  {
-    type: "function",
-    name: "previewRedeem",
-    inputs: [{ name: "shares", type: "uint256" }],
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
@@ -220,34 +179,47 @@ export const STAKING_VAULT_ABI = [
   },
   {
     type: "function",
-    name: "convertToShares",
-    inputs: [{ name: "assets", type: "uint256" }],
+    name: "borrowBalanceOf",
+    inputs: [{ name: "account", type: "address" }],
     outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getPoolWeeklyInterest",
+    inputs: [{ name: "pool", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "isWeekComplete",
+    inputs: [],
+    outputs: [{ name: "", type: "bool" }],
     stateMutability: "view",
   },
 ] as const;
 
-// Zero IL Vault ABI
-export const ZERO_IL_VAULT_ABI = [
+// WToken (Zero-IL wETH) ABI
+export const WTOKEN_ABI = [
   {
     type: "function",
     name: "deposit",
     inputs: [
-      { name: "assets", type: "uint256" },
-      { name: "receiver", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "minShares", type: "uint256" },
     ],
-    outputs: [{ name: "", type: "uint256" }],
+    outputs: [{ name: "shares", type: "uint256" }],
     stateMutability: "nonpayable",
   },
   {
     type: "function",
     name: "withdraw",
     inputs: [
-      { name: "assets", type: "uint256" },
-      { name: "receiver", type: "address" },
-      { name: "owner", type: "address" },
+      { name: "shares", type: "uint256" },
+      { name: "minAssets", type: "uint256" },
     ],
-    outputs: [{ name: "", type: "uint256" }],
+    outputs: [{ name: "assets", type: "uint256" }],
     stateMutability: "nonpayable",
   },
   {
@@ -259,21 +231,98 @@ export const ZERO_IL_VAULT_ABI = [
   },
   {
     type: "function",
-    name: "totalAssets",
+    name: "totalSupply",
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
   {
     type: "function",
-    name: "totalDeposited",
+    name: "pricePerShare",
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
   {
     type: "function",
-    name: "totalBorrowed",
+    name: "getTotalValue",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getPositionValue",
+    inputs: [{ name: "user", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getUserPnL",
+    inputs: [{ name: "user", type: "address" }],
+    outputs: [
+      { name: "pnl", type: "int256" },
+      { name: "pnlPercent", type: "int256" },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "convertToShares",
+    inputs: [{ name: "assets", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "convertToAssets",
+    inputs: [{ name: "shares", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "entryPrice",
+    inputs: [{ name: "user", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "depositsPaused",
+    inputs: [],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "withdrawalsPaused",
+    inputs: [],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+  },
+] as const;
+
+// LeverageAMM ABI
+export const LEVERAGE_AMM_ABI = [
+  {
+    type: "function",
+    name: "getPrice",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getTotalDebt",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getTotalLPValue",
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
@@ -287,52 +336,62 @@ export const ZERO_IL_VAULT_ABI = [
   },
   {
     type: "function",
-    name: "assetPrice",
+    name: "getEquity",
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
   {
     type: "function",
-    name: "getVaultStats",
+    name: "checkRebalance",
     inputs: [],
     outputs: [
-      { name: "_totalDeposited", type: "uint256" },
-      { name: "_totalBorrowed", type: "uint256" },
-      { name: "_currentDTV", type: "uint256" },
-      { name: "_assetPrice", type: "uint256" },
-      { name: "_totalValueUSD", type: "uint256" },
-      { name: "_pendingYield", type: "uint256" },
+      { name: "needsRebalance", type: "bool" },
+      { name: "isDeleverage", type: "bool" },
     ],
     stateMutability: "view",
   },
   {
     type: "function",
-    name: "estimatedAPR",
+    name: "accumulatedFees",
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
   {
     type: "function",
-    name: "isHealthy",
+    name: "pendingWTokenFees",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "isWeeklyPaymentDue",
     inputs: [],
     outputs: [{ name: "", type: "bool" }],
     stateMutability: "view",
   },
   {
     type: "function",
-    name: "previewDeposit",
-    inputs: [{ name: "assets", type: "uint256" }],
+    name: "getExpectedWeeklyInterest",
+    inputs: [],
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
   {
     type: "function",
-    name: "previewRedeem",
-    inputs: [{ name: "shares", type: "uint256" }],
-    outputs: [{ name: "", type: "uint256" }],
-    stateMutability: "view",
+    name: "rebalance",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "payWeeklyInterest",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
   },
 ] as const;
 
@@ -367,3 +426,6 @@ export const ERC20_ABI = [
   },
 ] as const;
 
+// For backwards compatibility, keep these exports
+export const MIM_MINTER_ABI = MIM_TOKEN_ABI; // MIM now has mint functions built-in
+export const ZERO_IL_VAULT_ABI = WTOKEN_ABI; // WToken is the zero-IL vault

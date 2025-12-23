@@ -1,30 +1,21 @@
 "use client";
 
-import { useReadContract, useWriteContract, useAccount, useReadContracts } from "wagmi";
-import { parseUnits, formatUnits } from "viem";
+import { useReadContract, useWriteContract, useAccount } from "wagmi";
+import { formatUnits } from "viem";
 import {
   MAGICPOOL_ADDRESSES,
   MIM_TOKEN_ABI,
-  MIM_MINTER_ABI,
   STAKING_VAULT_ABI,
   ERC20_ABI,
 } from "./index";
 
 const HUB_CHAIN_ID = 146; // Sonic
 
-// ============ Hook for MIM Minter (Mint/Redeem) ============
+// ============ Hook for MIM Token (Mint/Redeem with sUSDC) ============
 
 export function useMIMMinter() {
   const { address } = useAccount();
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
-
-  // Get pool stats
-  const { data: poolStats, refetch: refetchPoolStats } = useReadContract({
-    address: MAGICPOOL_ADDRESSES.mimMinter,
-    abi: MIM_MINTER_ABI,
-    functionName: "getPoolStats",
-    chainId: HUB_CHAIN_ID,
-  });
 
   // Get user sUSDC balance
   const { data: sUSDCBalance, refetch: refetchSUSDC } = useReadContract({
@@ -46,66 +37,81 @@ export function useMIMMinter() {
     query: { enabled: !!address },
   });
 
-  // Get allowance for sUSDC to MIMMinter
+  // Get allowance for sUSDC to MIM contract
   const { data: sUSDCAllowance, refetch: refetchAllowance } = useReadContract({
     address: MAGICPOOL_ADDRESSES.sUSDC,
     abi: ERC20_ABI,
     functionName: "allowance",
-    args: address ? [address, MAGICPOOL_ADDRESSES.mimMinter] : undefined,
+    args: address ? [address, MAGICPOOL_ADDRESSES.mimToken] : undefined,
     chainId: HUB_CHAIN_ID,
     query: { enabled: !!address },
   });
 
-  // Approve sUSDC for MIMMinter
+  // Get total MIM supply and backing
+  const { data: totalSupply, refetch: refetchSupply } = useReadContract({
+    address: MAGICPOOL_ADDRESSES.mimToken,
+    abi: MIM_TOKEN_ABI,
+    functionName: "totalSupply",
+    chainId: HUB_CHAIN_ID,
+  });
+
+  const { data: totalBacking, refetch: refetchBacking } = useReadContract({
+    address: MAGICPOOL_ADDRESSES.mimToken,
+    abi: MIM_TOKEN_ABI,
+    functionName: "totalBacking",
+    chainId: HUB_CHAIN_ID,
+  });
+
+  // Approve sUSDC for MIM contract
   const approveSUSDC = async (amount: bigint) => {
     return writeContractAsync({
       address: MAGICPOOL_ADDRESSES.sUSDC,
       abi: ERC20_ABI,
       functionName: "approve",
-      args: [MAGICPOOL_ADDRESSES.mimMinter, amount],
+      args: [MAGICPOOL_ADDRESSES.mimToken, amount],
       chainId: HUB_CHAIN_ID,
     });
   };
 
-  // Mint MIM with sUSDC
+  // Mint MIM with sUSDC (1:1)
   const mintMIM = async (amount: bigint) => {
     return writeContractAsync({
-      address: MAGICPOOL_ADDRESSES.mimMinter,
-      abi: MIM_MINTER_ABI,
-      functionName: "mint",
+      address: MAGICPOOL_ADDRESSES.mimToken,
+      abi: MIM_TOKEN_ABI,
+      functionName: "mintWithUSDC",
       args: [amount],
       chainId: HUB_CHAIN_ID,
     });
   };
 
-  // Redeem sUSDC for MIM
+  // Redeem MIM for sUSDC (1:1)
   const redeemMIM = async (amount: bigint) => {
     return writeContractAsync({
-      address: MAGICPOOL_ADDRESSES.mimMinter,
-      abi: MIM_MINTER_ABI,
-      functionName: "redeem",
+      address: MAGICPOOL_ADDRESSES.mimToken,
+      abi: MIM_TOKEN_ABI,
+      functionName: "redeemForUSDC",
       args: [amount],
       chainId: HUB_CHAIN_ID,
     });
   };
 
   const refetch = () => {
-    refetchPoolStats();
     refetchSUSDC();
     refetchMIM();
     refetchAllowance();
+    refetchSupply();
+    refetchBacking();
   };
 
   return {
     // Pool stats
-    totalSUSDCDeposited: poolStats ? formatUnits(poolStats[0], 6) : "0",
-    totalMIMMinted: poolStats ? formatUnits(poolStats[1], 6) : "0",
-    liquidity: poolStats ? poolStats[2].toString() : "0",
+    totalMIMSupply: totalSupply ? formatUnits(totalSupply, 18) : "0", // MIM has 18 decimals
+    totalSUSDCBacking: totalBacking ? formatUnits(totalBacking, 6) : "0", // sUSDC has 6 decimals
     
     // User balances
-    sUSDCBalance: sUSDCBalance ? formatUnits(sUSDCBalance, 6) : "0",
+    sUSDCBalance: sUSDCBalance ? formatUnits(sUSDCBalance, 6) : "0", // sUSDC has 6 decimals
     sUSDCBalanceRaw: sUSDCBalance || BigInt(0),
-    mimBalance: mimBalance ? formatUnits(mimBalance, 6) : "0",
+    mimBalance: mimBalance ? formatUnits(mimBalance, 18) : "0", // MIM has 18 decimals
     mimBalanceRaw: mimBalance || BigInt(0),
     
     // Allowance
@@ -128,14 +134,6 @@ export function useMIMMinter() {
 export function useStakingVault() {
   const { address } = useAccount();
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
-
-  // Get vault stats
-  const { data: vaultStats, refetch: refetchVaultStats } = useReadContract({
-    address: MAGICPOOL_ADDRESSES.stakingVault,
-    abi: STAKING_VAULT_ABI,
-    functionName: "getVaultStats",
-    chainId: HUB_CHAIN_ID,
-  });
 
   // Get user sMIM balance
   const { data: sMIMBalance, refetch: refetchSMIM } = useReadContract({
@@ -167,12 +165,46 @@ export function useStakingVault() {
     query: { enabled: !!address },
   });
 
-  // Preview deposit
-  const { data: previewDepositResult } = useReadContract({
+  // Get vault stats
+  const { data: totalAssets, refetch: refetchTotalAssets } = useReadContract({
     address: MAGICPOOL_ADDRESSES.stakingVault,
     abi: STAKING_VAULT_ABI,
-    functionName: "previewDeposit",
-    args: [parseUnits("1", 6)], // Preview for 1 MIM
+    functionName: "totalAssets",
+    chainId: HUB_CHAIN_ID,
+  });
+
+  const { data: totalBorrows, refetch: refetchTotalBorrows } = useReadContract({
+    address: MAGICPOOL_ADDRESSES.stakingVault,
+    abi: STAKING_VAULT_ABI,
+    functionName: "totalBorrows",
+    chainId: HUB_CHAIN_ID,
+  });
+
+  const { data: availableCash, refetch: refetchCash } = useReadContract({
+    address: MAGICPOOL_ADDRESSES.stakingVault,
+    abi: STAKING_VAULT_ABI,
+    functionName: "getCash",
+    chainId: HUB_CHAIN_ID,
+  });
+
+  const { data: utilizationRate, refetch: refetchUtilization } = useReadContract({
+    address: MAGICPOOL_ADDRESSES.stakingVault,
+    abi: STAKING_VAULT_ABI,
+    functionName: "utilizationRate",
+    chainId: HUB_CHAIN_ID,
+  });
+
+  const { data: borrowRateRaw, refetch: refetchBorrowRate } = useReadContract({
+    address: MAGICPOOL_ADDRESSES.stakingVault,
+    abi: STAKING_VAULT_ABI,
+    functionName: "borrowRate",
+    chainId: HUB_CHAIN_ID,
+  });
+
+  const { data: supplyRateRaw, refetch: refetchSupplyRate } = useReadContract({
+    address: MAGICPOOL_ADDRESSES.stakingVault,
+    abi: STAKING_VAULT_ABI,
+    functionName: "supplyRate",
     chainId: HUB_CHAIN_ID,
   });
 
@@ -189,60 +221,71 @@ export function useStakingVault() {
 
   // Deposit MIM to get sMIM
   const deposit = async (amount: bigint) => {
-    if (!address) throw new Error("No address");
     return writeContractAsync({
       address: MAGICPOOL_ADDRESSES.stakingVault,
       abi: STAKING_VAULT_ABI,
       functionName: "deposit",
-      args: [amount, address],
+      args: [amount],
       chainId: HUB_CHAIN_ID,
     });
   };
 
-  // Withdraw MIM by burning sMIM
-  const withdraw = async (assets: bigint) => {
-    if (!address) throw new Error("No address");
+  // Withdraw sMIM to get MIM back
+  const withdraw = async (shares: bigint) => {
     return writeContractAsync({
       address: MAGICPOOL_ADDRESSES.stakingVault,
       abi: STAKING_VAULT_ABI,
       functionName: "withdraw",
-      args: [assets, address, address],
+      args: [shares],
       chainId: HUB_CHAIN_ID,
     });
   };
 
   const refetch = () => {
-    refetchVaultStats();
     refetchSMIM();
     refetchMIM();
     refetchAllowance();
+    refetchTotalAssets();
+    refetchTotalBorrows();
+    refetchCash();
+    refetchUtilization();
+    refetchBorrowRate();
+    refetchSupplyRate();
   };
 
-  // Calculate interest rate from basis points
-  const interestRate = vaultStats ? Number(vaultStats[4]) / 100 : 0; // Convert BP to percentage
-  const utilization = vaultStats ? Number(vaultStats[3]) / 100 : 0; // Convert BP to percentage
+  // Calculate utilization as percentage (from 18 decimals)
+  const utilizationPct = utilizationRate 
+    ? Number(utilizationRate) / 1e16 // Convert from 18 decimals to percentage
+    : 0;
+  
+  // Calculate interest rates as percentages (from 18 decimals)
+  const borrowAPR = borrowRateRaw 
+    ? Number(borrowRateRaw) / 1e16 // Convert from 18 decimals to percentage
+    : 10; // Default 10% base rate
+    
+  const supplyAPR = supplyRateRaw
+    ? Number(supplyRateRaw) / 1e16 
+    : 0;
 
   return {
     // Vault stats
-    totalAssets: vaultStats ? formatUnits(vaultStats[0], 6) : "0",
-    totalBorrowed: vaultStats ? formatUnits(vaultStats[1], 6) : "0",
-    availableLiquidity: vaultStats ? formatUnits(vaultStats[2], 6) : "0",
-    utilization, // percentage
-    interestRate, // percentage (APR)
-    totalInterestEarned: vaultStats ? formatUnits(vaultStats[5], 6) : "0",
+    totalAssets: totalAssets ? formatUnits(totalAssets, 18) : "0", // MIM has 18 decimals
+    totalBorrowed: totalBorrows ? formatUnits(totalBorrows, 18) : "0", // MIM has 18 decimals
+    availableLiquidity: availableCash ? formatUnits(availableCash, 18) : "0", // MIM has 18 decimals
+    utilization: utilizationPct,
+    interestRate: borrowAPR,
+    supplyRate: supplyAPR,
+    totalInterestEarned: "0", // TODO: Calculate from borrow index changes
     
     // User balances
-    sMIMBalance: sMIMBalance ? formatUnits(sMIMBalance, 6) : "0",
+    sMIMBalance: sMIMBalance ? formatUnits(sMIMBalance, 18) : "0", // sMIM has 18 decimals
     sMIMBalanceRaw: sMIMBalance || BigInt(0),
-    mimBalance: mimBalance ? formatUnits(mimBalance, 6) : "0",
+    mimBalance: mimBalance ? formatUnits(mimBalance, 18) : "0", // MIM has 18 decimals
     mimBalanceRaw: mimBalance || BigInt(0),
     
     // Allowance
     mimAllowance: mimAllowance || BigInt(0),
     needsApproval: (amount: bigint) => (mimAllowance || BigInt(0)) < amount,
-    
-    // Exchange rate (sMIM per MIM)
-    exchangeRate: previewDepositResult ? formatUnits(previewDepositResult, 6) : "1",
     
     // Actions
     approveMIM,
@@ -270,4 +313,3 @@ export function useMagicPool() {
     },
   };
 }
-

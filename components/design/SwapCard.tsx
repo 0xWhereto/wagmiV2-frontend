@@ -37,6 +37,7 @@ interface TokenWithBalance {
   symbol: string;
   name: string;
   balance: string;
+  balanceRaw?: string;  // Full precision balance for MAX button
   address?: string;
   decimals?: number;
 }
@@ -93,6 +94,7 @@ export function SwapCard({ onTokensChange }: SwapCardProps = {}) {
         symbol: token.symbol,
         name: token.name,
         balance: sourceBalances[token.symbol]?.balanceFormatted || '0.00',
+        balanceRaw: sourceBalances[token.symbol]?.balanceRaw || '0', // Full precision for MAX
         address: token.address,
         decimals: token.decimals,
       }));
@@ -103,6 +105,7 @@ export function SwapCard({ onTokensChange }: SwapCardProps = {}) {
         symbol: token.symbol,
         name: token.name,
         balance: hubBalances[token.symbol]?.balanceFormatted || '0.00',
+        balanceRaw: hubBalances[token.symbol]?.balanceRaw || '0', // Full precision for MAX
         address: token.address,
         decimals: token.decimals,
       }));
@@ -119,6 +122,7 @@ export function SwapCard({ onTokensChange }: SwapCardProps = {}) {
           symbol: token.symbol,
           name: token.name,
           balance: hubBalances[token.symbol]?.balanceFormatted || '0.00',
+          balanceRaw: hubBalances[token.symbol]?.balanceRaw || '0',
           address: token.address,
           decimals: token.decimals,
         }));
@@ -132,6 +136,7 @@ export function SwapCard({ onTokensChange }: SwapCardProps = {}) {
           symbol: token.symbol,
           name: token.name,
           balance: '0.00',
+          balanceRaw: '0',
           address: token.address,
           decimals: token.decimals,
         }));
@@ -143,6 +148,7 @@ export function SwapCard({ onTokensChange }: SwapCardProps = {}) {
       symbol: token.symbol,
       name: token.name,
       balance: hubBalances[token.symbol]?.balanceFormatted || '0.00',
+      balanceRaw: hubBalances[token.symbol]?.balanceRaw || '0',
       address: token.address,
       decimals: token.decimals,
     }));

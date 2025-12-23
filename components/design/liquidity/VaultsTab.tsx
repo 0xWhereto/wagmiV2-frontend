@@ -14,6 +14,7 @@ import {
 import { useAccount, useSwitchChain } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
 import { useAllZeroILVaults } from '@/lib/contracts/magicpool/useZeroILVault';
+import { useMIMStaking } from '@/lib/contracts/0IL/use0IL';
 
 // Hub chain ID (Sonic)
 const HUB_CHAIN_ID = 146;
@@ -29,6 +30,15 @@ export function VaultsTab() {
 
   // Hook into real contracts
   const { wethVault, wbtcVault, refetchAll } = useAllZeroILVaults();
+  
+  // Get sMIM vault data for available liquidity calculation
+  const { totalAssets: sMIMTotalAssets, totalBorrows: sMIMTotalBorrows } = useMIMStaking();
+  
+  // Calculate available liquidity: (totalAssets * 0.9) - totalBorrows
+  const maxUtilization = 0.9; // 90% max utilization
+  const totalAssetsNum = parseFloat(sMIMTotalAssets || '0');
+  const totalBorrowsNum = parseFloat(sMIMTotalBorrows || '0');
+  const availableLiquidity = Math.max(0, (totalAssetsNum * maxUtilization) - totalBorrowsNum);
 
   // Check if on correct chain
   const isOnHubChain = chainId === HUB_CHAIN_ID;
@@ -203,10 +213,10 @@ export function VaultsTab() {
           </div>
           <div className="p-4 bg-zinc-900/30 rounded-xl">
             <div className="flex items-center gap-2 text-zinc-500 text-sm mb-2">
-              <Shield className="w-4 h-4" />
-              Leverage
+              <Lock className="w-4 h-4" />
+              Available Liquidity
             </div>
-            <div className="text-zinc-100 text-2xl">2x (50% DTV)</div>
+            <div className="text-zinc-100 text-2xl">{formatUSD(availableLiquidity)}</div>
           </div>
           <div className="p-4 bg-zinc-900/30 rounded-xl">
             <div className="flex items-center gap-2 text-zinc-500 text-sm mb-2">
@@ -481,6 +491,12 @@ export function VaultsTab() {
                         </button>
                         <span className="text-zinc-400">{actionMode === 'deposit' ? vaultData.asset : vaultData.wToken}</span>
                       </div>
+                      {/* USD Value */}
+                      {depositAmount && parseFloat(depositAmount) > 0 && (
+                        <p className="text-zinc-500 text-xs mt-1 ml-1">
+                          ≈ ${formatNumber(parseFloat(depositAmount) * vaultData.vault.assetPrice, 2)}
+                        </p>
+                      )}
                     </div>
 
                     {/* Info */}

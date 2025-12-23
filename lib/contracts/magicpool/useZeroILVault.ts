@@ -1,60 +1,47 @@
 "use client";
 
 import { useReadContract, useWriteContract, useAccount } from "wagmi";
-import { parseUnits, formatUnits } from "viem";
+import { formatUnits } from "viem";
 import {
   MAGICPOOL_ADDRESSES,
-  ZERO_IL_VAULT_ABI,
+  WTOKEN_ABI,
   ERC20_ABI,
 } from "./index";
 
 const HUB_CHAIN_ID = 146; // Sonic
 
-// sWETH and sWBTC addresses
-const ASSET_ADDRESSES = {
-  sWETH: "0x5E501C482952c1F2D58a4294F9A97759968c5125" as `0x${string}`,
-  sWBTC: "0x2F0324268031E6413280F3B5ddBc4A97639A284a" as `0x${string}`,
-} as const;
-
-// Asset decimals
-const ASSET_DECIMALS = {
-  sWETH: 18,
-  sWBTC: 8,
-};
+// Simple Oracle ABI
+const ORACLE_ABI = [
+  {
+    inputs: [],
+    name: "getPrice",
+    outputs: [{ type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
 
 type VaultType = "sWETH" | "sWBTC";
 
+/**
+ * Hook for Zero-IL vault interactions
+ * Note: In the new 0IL system, we currently only have sWETH vault deployed
+ * sWBTC vault would follow the same pattern when deployed
+ */
 export function useZeroILVault(vaultType: VaultType) {
   const { address } = useAccount();
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
 
-  const vaultAddress = vaultType === "sWETH" 
-    ? MAGICPOOL_ADDRESSES.wethZeroILVault 
-    : MAGICPOOL_ADDRESSES.wbtcZeroILVault;
-  
-  const assetAddress = ASSET_ADDRESSES[vaultType];
-  const decimals = ASSET_DECIMALS[vaultType];
+  // Currently only wETH vault is deployed
+  // For sWBTC, we'd need to deploy a separate LeverageAMM + WToken
+  const vaultAddress = MAGICPOOL_ADDRESSES.wETH; // wETH Zero-IL token
+  const assetAddress = MAGICPOOL_ADDRESSES.sWETH;
+  const decimals = vaultType === "sWETH" ? 18 : 8;
 
-  // Get vault stats
-  const { data: vaultStats, refetch: refetchVaultStats } = useReadContract({
-    address: vaultAddress,
-    abi: ZERO_IL_VAULT_ABI,
-    functionName: "getVaultStats",
-    chainId: HUB_CHAIN_ID,
-  });
-
-  // Get estimated APR
-  const { data: estimatedAPR } = useReadContract({
-    address: vaultAddress,
-    abi: ZERO_IL_VAULT_ABI,
-    functionName: "estimatedAPR",
-    chainId: HUB_CHAIN_ID,
-  });
-
-  // Get user vault token balance (wToken)
+  // Get wToken balance (vault shares)
   const { data: wTokenBalance, refetch: refetchWToken } = useReadContract({
     address: vaultAddress,
-    abi: ZERO_IL_VAULT_ABI,
+    abi: WTOKEN_ABI,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
     chainId: HUB_CHAIN_ID,
@@ -81,6 +68,42 @@ export function useZeroILVault(vaultType: VaultType) {
     query: { enabled: !!address },
   });
 
+  // Get wToken stats
+  const { data: pricePerShare } = useReadContract({
+    address: vaultAddress,
+    abi: WTOKEN_ABI,
+    functionName: "pricePerShare",
+    chainId: HUB_CHAIN_ID,
+  });
+
+  const { data: totalValue } = useReadContract({
+    address: vaultAddress,
+    abi: WTOKEN_ABI,
+    functionName: "getTotalValue",
+    chainId: HUB_CHAIN_ID,
+  });
+
+  const { data: positionValue } = useReadContract({
+    address: vaultAddress,
+    abi: WTOKEN_ABI,
+    functionName: "getPositionValue",
+    args: address ? [address] : undefined,
+    chainId: HUB_CHAIN_ID,
+    query: { enabled: !!address },
+  });
+
+  // Get asset price from oracle (MIM per sWETH)
+  // Since MIM is 1:1 with USDC, this gives USD price
+  const { data: oraclePrice } = useReadContract({
+    address: MAGICPOOL_ADDRESSES.oracleAdapter,
+    abi: ORACLE_ABI,
+    functionName: "getPrice",
+    chainId: HUB_CHAIN_ID,
+  });
+
+  // sWETH price in USD (oracle returns MIM per sWETH ≈ USD per sWETH)
+  const assetPriceUSD = oraclePrice ? parseFloat(formatUnits(oraclePrice, 18)) : 3000;
+
   // Approve asset for vault
   const approveAsset = async (amount: bigint) => {
     return writeContractAsync({
@@ -93,46 +116,36 @@ export function useZeroILVault(vaultType: VaultType) {
   };
 
   // Deposit asset to vault
-  const deposit = async (amount: bigint) => {
-    if (!address) throw new Error("No address");
+  const deposit = async (amount: bigint, minShares: bigint = BigInt(0)) => {
     return writeContractAsync({
       address: vaultAddress,
-      abi: ZERO_IL_VAULT_ABI,
+      abi: WTOKEN_ABI,
       functionName: "deposit",
-      args: [amount, address],
+      args: [amount, minShares],
       chainId: HUB_CHAIN_ID,
     });
   };
 
   // Withdraw asset from vault
-  const withdraw = async (amount: bigint) => {
-    if (!address) throw new Error("No address");
+  const withdraw = async (shares: bigint, minAssets: bigint = BigInt(0)) => {
     return writeContractAsync({
       address: vaultAddress,
-      abi: ZERO_IL_VAULT_ABI,
+      abi: WTOKEN_ABI,
       functionName: "withdraw",
-      args: [amount, address, address],
+      args: [shares, minAssets],
       chainId: HUB_CHAIN_ID,
     });
   };
 
   const refetch = () => {
-    refetchVaultStats();
     refetchWToken();
     refetchAsset();
     refetchAllowance();
   };
 
-  // Parse vault stats
-  const totalDeposited = vaultStats ? formatUnits(vaultStats[0], decimals) : "0";
-  const totalBorrowed = vaultStats ? formatUnits(vaultStats[1], 6) : "0"; // MIM has 6 decimals
-  const currentDTV = vaultStats ? Number(vaultStats[2]) / 100 : 0; // BP to percentage
-  const assetPrice = vaultStats ? Number(vaultStats[3]) / 1e6 : 0; // 6 decimals to float
-  const totalValueUSD = vaultStats ? formatUnits(vaultStats[4], 6) : "0";
-  const pendingYield = vaultStats ? formatUnits(vaultStats[5], decimals) : "0";
-
-  // Calculate APR from basis points
-  const apr = estimatedAPR ? Number(estimatedAPR) / 100 : 15; // Default 15% if not set
+  // Calculate approximate APR (trading fees + rebalancing rewards - borrow interest)
+  // This is a placeholder - real APR would come from historical data
+  const apr = 15; // Default 15% APR estimate
 
   return {
     // Vault info
@@ -142,19 +155,23 @@ export function useZeroILVault(vaultType: VaultType) {
     decimals,
     
     // Vault stats
-    totalDeposited,
-    totalBorrowed,
-    currentDTV, // percentage
-    assetPrice, // USD
-    totalValueUSD,
-    pendingYield,
-    apr, // percentage
+    totalDeposited: totalValue ? formatUnits(totalValue, decimals) : "0",
+    totalBorrowed: "0", // Would come from LeverageAMM
+    currentDTV: 50, // Target 50% DTV
+    assetPrice: assetPriceUSD, // From oracle
+    totalValueUSD: totalValue 
+      ? (parseFloat(formatUnits(totalValue, decimals)) * assetPriceUSD).toString() 
+      : "0",
+    pendingYield: "0",
+    apr,
+    pricePerShare: pricePerShare ? formatUnits(pricePerShare, 18) : "1.0",
     
     // User balances
     wTokenBalance: wTokenBalance ? formatUnits(wTokenBalance, decimals) : "0",
     wTokenBalanceRaw: wTokenBalance || BigInt(0),
     assetBalance: assetBalance ? formatUnits(assetBalance, decimals) : "0",
     assetBalanceRaw: assetBalance || BigInt(0),
+    positionValue: positionValue ? formatUnits(positionValue, decimals) : "0",
     
     // Allowance
     assetAllowance: assetAllowance || BigInt(0),
@@ -171,18 +188,18 @@ export function useZeroILVault(vaultType: VaultType) {
   };
 }
 
-// Hook to get both vaults
+// Hook to get wETH vault (sWBTC vault not yet deployed)
 export function useAllZeroILVaults() {
   const wethVault = useZeroILVault("sWETH");
-  const wbtcVault = useZeroILVault("sWBTC");
+  // sWBTC vault would be added here when deployed
+  const wbtcVault = useZeroILVault("sWETH"); // Placeholder - using sWETH vault for now
 
   return {
     wethVault,
     wbtcVault,
     refetchAll: () => {
       wethVault.refetch();
-      wbtcVault.refetch();
+      // wbtcVault.refetch(); // Would be called when deployed
     },
   };
 }
-

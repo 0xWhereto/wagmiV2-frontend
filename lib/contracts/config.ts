@@ -20,15 +20,15 @@ export const CHAIN_CONFIG = {
       swapRouter: "0x8BbF9fF8CE8060B85DFe48d7b7E897d09418De9B",
       nonfungiblePositionManager: "0x5826e10B513C891910032F15292B2F1b3041C3Df",
       quoterV2: "0x57e3e0a9DfB3DA34cc164B2C8dD1EBc404c45d47",
-      // MagicPool contracts
-      mimToken: "0x2321e7dDdC1aF826E1827Ee41C306f8837656846",
-      mimMinter: "0x38FB72EB47213cC75797249a9daC5CD357F2021c",
-      stakingVault: "0x1880d94b47af6c80BbCa973B383221fD53A6e139",
-      // Zero IL Vaults
-      wethZeroILVault: "0x27C42A9184D45A3657b7fEE9cd9969216BAd9CE3",
-      wbtcZeroILVault: "0x1544Dc2A93c148C04dEA54Bd150EBb5BB3948ac2",
-      wethZeroILStrategy: "0x80A13466aE5185d375e5b75b1bA66d47B773858c",
-      wbtcZeroILStrategy: "0xf51Ff777724F8B5Dae8e7BD6295D2d6eA7C89bC8",
+      // 0IL Protocol v6 Contracts (correct sUSDC + correct pool with new MIM)
+      mim: "0x84dC0B4EA2f302CCbDe37cFC6a4C434e0Fd08708", // MIM stablecoin (18 decimals)
+      stakingVault: "0x4671B3F169Daee1eC027d60B484ce4fb98cF7db7", // sMIM vault (v2 - with new MIM)
+      mimUsdcPool: "0xFBfb4e7DE02EFfd36c9A307340a6a0AdCd01663B", // MIM/sUSDC peg pool (0.01% fee)
+      swethMimPool: "0x4ed3B3e2AD7e19124D921fE2F6956e1C62Cbf190", // sWETH/MIM pool (0.05% fee)
+      oracleAdapter: "0xD8680463F66C7bF74C61A2660aF4d7094ee9F749", // SimpleOracle
+      v3LPVault: "0x1139d155D39b2520047178444C51D3D70204650F",
+      leverageAMM: "0x8CA24d00ffcF60e9ba7F67F9d41ccA28E22dF508",
+      wETH: "0xEA7681f28c62AbF83DeD17eEd88D48b3BD813Af7", // Zero-IL wETH token (v9)
     },
     nativeCurrency: {
       name: "Sonic",
