@@ -5,7 +5,9 @@ import { TrendingUp, ArrowUpRight, ArrowDownRight, Info, Shield } from 'lucide-r
 import { motion } from 'framer-motion';
 import { useAllZeroILVaults } from '@/lib/contracts/magicpool/useZeroILVault';
 import { useMIMStaking } from '@/lib/contracts/0IL/use0IL';
+import { useLiquidity, tickToPrice } from '@/lib/contracts/hooks/useLiquidity';
 import { useRouter } from 'next/navigation';
+import { formatUnits } from 'viem';
 
 const LEVERAGED_POSITIONS = [
   {
@@ -42,10 +44,7 @@ const STRATEGY_POSITIONS = [
   { id: 2, name: 'WS/WETH', deposited: '$3,200', earned: '$156', apr: '45.2%' },
 ];
 
-const V3_POSITIONS = [
-  { id: 1, pair: 'ETH/USDC', liquidity: '$5,420', fees: '$234', apr: '18.7%' },
-  { id: 2, pair: 'ETH/DAI', liquidity: '$2,150', fees: '$98', apr: '22.1%' },
-];
+// V3_POSITIONS will be fetched dynamically
 
 const LEVERAGE_LIQUIDITY_POSITIONS = [
   { id: 1, name: 'WS/Anon', supplied: '$4,500', earned: '$187', apr: '87.6%' },
@@ -61,6 +60,43 @@ export function DashboardPage() {
   // Real Zero IL vault data
   const { wethVault, wbtcVault } = useAllZeroILVaults();
   const { balance: sMIMBalance, totalAssets: sMIMTotalAssets } = useMIMStaking();
+  
+  // Real V3 positions
+  const { positions: v3Positions, isLoading: v3Loading } = useLiquidity();
+  
+  // Token prices for USD value calculation
+  const getTokenPrice = (symbol: string): number => {
+    const prices: Record<string, number> = {
+      'sWETH': wethVault.assetPrice || 3000,
+      'sWBTC': 95000,
+      'MIM': 1,
+      'sUSDC': 1,
+      'sUSDT': 1,
+    };
+    return prices[symbol] || 1;
+  };
+  
+  // Calculate position USD value
+  const calculatePositionValue = (position: any): number => {
+    try {
+      const token0Price = getTokenPrice(position.token0Symbol);
+      const token1Price = getTokenPrice(position.token1Symbol);
+      const token0Decimals = position.token0Decimals || 18;
+      const token1Decimals = position.token1Decimals || 18;
+      
+      // Estimate token amounts from liquidity
+      const liquidity = Number(position.liquidity);
+      const sqrtLiquidity = Math.sqrt(liquidity);
+      
+      // Rough estimate: half in each token
+      const amount0Est = sqrtLiquidity / (10 ** (token0Decimals / 2));
+      const amount1Est = sqrtLiquidity / (10 ** (token1Decimals / 2));
+      
+      return (amount0Est * token0Price + amount1Est * token1Price) / 1000;
+    } catch {
+      return 0;
+    }
+  };
 
   const tradingBalance = LEVERAGED_POSITIONS.reduce((sum, pos) => {
     const size = parseFloat(pos.size.replace(/[$,]/g, ''));
@@ -80,9 +116,9 @@ export function DashboardPage() {
       total += parseFloat(pos.deposited.replace(/[$,]/g, ''));
     });
     
-    // V3 positions
-    V3_POSITIONS.forEach(pos => {
-      total += parseFloat(pos.liquidity.replace(/[$,]/g, ''));
+    // V3 positions - real data
+    v3Positions.forEach(pos => {
+      total += calculatePositionValue(pos);
     });
     
     // Zero IL Vaults - real data
@@ -458,42 +494,92 @@ export function DashboardPage() {
 
         {activePortfolioTab === 'V3 Pools' && (
           <div className="space-y-3">
-            {V3_POSITIONS.map((position, index) => (
-              <motion.div
-                key={position.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}
-                className="p-6 bg-zinc-900/30 rounded-lg hover:bg-zinc-900/50 transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center -space-x-2">
-                      <div className="w-10 h-10 rounded-full bg-zinc-700 border-2 border-zinc-950" />
-                      <div className="w-10 h-10 rounded-full bg-zinc-600 border-2 border-zinc-950" />
-                    </div>
-                    <div className="text-zinc-100">{position.pair}</div>
-                  </div>
-                  <div className="flex items-center gap-8">
-                    <div className="text-right">
-                      <div className="text-zinc-500 text-sm mb-1">Liquidity</div>
-                      <div className="text-zinc-100">{position.liquidity}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-zinc-500 text-sm mb-1">Fees Earned</div>
-                      <div className="text-green-400">{position.fees}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-zinc-500 text-sm mb-1">APR</div>
-                      <div className="text-zinc-100">{position.apr}</div>
-                    </div>
-                    <button className="px-6 py-2 border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-zinc-100 rounded-lg transition-all">
-                      Manage
-                    </button>
-                  </div>
+            {v3Loading ? (
+              <div className="p-12 bg-zinc-900/20 rounded-lg text-center">
+                <div className="animate-pulse text-zinc-500">Loading positions...</div>
+              </div>
+            ) : v3Positions.length === 0 ? (
+              <div className="p-12 bg-zinc-900/20 rounded-lg text-center">
+                <div className="w-12 h-12 rounded-full bg-zinc-800 mx-auto mb-4 flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-zinc-600" />
                 </div>
-              </motion.div>
-            ))}
+                <div className="text-zinc-400 mb-4">No V3 liquidity positions yet</div>
+                <button 
+                  onClick={() => router.push('/liquidity')}
+                  className="px-6 py-3 bg-zinc-100 hover:bg-white text-zinc-950 rounded-lg transition-all"
+                >
+                  Add Liquidity
+                </button>
+              </div>
+            ) : (
+              v3Positions.map((position, index) => {
+                const posValue = calculatePositionValue(position);
+                const feeValue0 = Number(formatUnits(position.tokensOwed0, position.token0Decimals || 18));
+                const feeValue1 = Number(formatUnits(position.tokensOwed1, position.token1Decimals || 18));
+                const feesUSD = feeValue0 * getTokenPrice(position.token0Symbol || '') + 
+                               feeValue1 * getTokenPrice(position.token1Symbol || '');
+                
+                return (
+                  <motion.div
+                    key={position.tokenId.toString()}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                    className="p-6 bg-zinc-900/30 rounded-lg hover:bg-zinc-900/50 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center -space-x-2">
+                          <div className="w-10 h-10 rounded-full bg-zinc-700 border-2 border-zinc-950 flex items-center justify-center text-xs text-zinc-300">
+                            {position.token0Symbol?.slice(0, 2)}
+                          </div>
+                          <div className="w-10 h-10 rounded-full bg-zinc-600 border-2 border-zinc-950 flex items-center justify-center text-xs text-zinc-300">
+                            {position.token1Symbol?.slice(0, 2)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-zinc-100 flex items-center gap-2">
+                            {position.token0Symbol}/{position.token1Symbol}
+                            <span className="text-xs px-2 py-0.5 bg-zinc-800/50 text-zinc-400 rounded">
+                              {position.fee / 10000}%
+                            </span>
+                          </div>
+                          <div className="text-zinc-500 text-xs">
+                            ID: {position.tokenId.toString()}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-8">
+                        <div className="text-right">
+                          <div className="text-zinc-500 text-sm mb-1">Value</div>
+                          <div className="text-zinc-100">
+                            ${posValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-zinc-500 text-sm mb-1">Fees Earned</div>
+                          <div className="text-green-400">
+                            ${feesUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-zinc-500 text-sm mb-1">Range</div>
+                          <div className="text-zinc-100 text-sm">
+                            {tickToPrice(position.tickLower).toFixed(4)} - {tickToPrice(position.tickUpper).toFixed(4)}
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => router.push('/liquidity')}
+                          className="px-6 py-2 border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-zinc-100 rounded-lg transition-all"
+                        >
+                          Manage
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })
+            )}
           </div>
         )}
 
