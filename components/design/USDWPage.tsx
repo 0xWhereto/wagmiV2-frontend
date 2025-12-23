@@ -63,6 +63,16 @@ export function USDWPage() {
   // Check if on correct chain
   const isOnHubChain = chainId === HUB_CHAIN_ID;
 
+  // Truncate to specific decimal places (for input fields)
+  const truncateDecimals = (value: string, decimals = 6): string => {
+    const num = parseFloat(value);
+    if (isNaN(num)) return '0';
+    // Truncate (not round) to avoid exceeding balance
+    const factor = Math.pow(10, decimals);
+    const truncated = Math.floor(num * factor) / factor;
+    return truncated.toString();
+  };
+
   // Format numbers for display
   const formatNumber = (value: string | number, decimals = 2) => {
     const num = typeof value === 'string' ? parseFloat(value) : value;
@@ -489,7 +499,7 @@ export function USDWPage() {
                         />
                         <button
                           onClick={() => setSupplyAmount(
-                            (supplyMode === 'supply' ? minter.mimBalance : vault.sMIMBalance).replace(/,/g, '')
+                            truncateDecimals(supplyMode === 'supply' ? minter.mimBalance : vault.sMIMBalance, 6)
                           )}
                           className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300 transition-colors text-sm"
                         >
@@ -509,7 +519,7 @@ export function USDWPage() {
                     <div className="p-4 bg-zinc-800/50 rounded-lg mb-6 space-y-3">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-zinc-500">You will receive</span>
-                        <span className="text-zinc-100">{supplyAmount} sMIM</span>
+                        <span className="text-zinc-100">{formatNumber(supplyAmount, 6)} sMIM</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-zinc-500">Estimated yearly earnings</span>
