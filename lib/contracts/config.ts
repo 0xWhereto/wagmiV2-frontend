@@ -45,7 +45,7 @@ export const CHAIN_CONFIG = {
     explorer: "https://arbiscan.io",
     isHubChain: false,
     contracts: {
-      gatewayVault: "0x187ddD9a94236Ba6d22376eE2E3C4C834e92f34e", // NEW GATEWAY
+      gatewayVault: "0x2d603F7B0d06Bd5f6232Afe1991aF3D103d68071", // NEW GATEWAY with rescue function
     },
     nativeCurrency: {
       name: "Ethereum",
