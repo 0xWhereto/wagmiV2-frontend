@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
-import { Waves, TrendingUp, DollarSign } from 'lucide-react';
+import { Waves, TrendingUp, DollarSign, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { PoolAnalytics } from './PoolAnalytics';
 import Image from 'next/image';
 import { useAccount } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
@@ -178,8 +179,8 @@ function AddLiquidityModal({
   // Adjusted price = raw_price * 10^(token0_decimals - token1_decimals)
   const currentPriceRaw = useMemo(() => {
     if (!sqrtPriceX96 || !sortedToken0 || !sortedToken1) return undefined;
-    const Q96 = BigInt(2) ** BigInt(96);
-    const sqrtPrice = Number(sqrtPriceX96) / Number(Q96);
+    const Q96 = 2 ** 96; // Use regular number, not BigInt
+    const sqrtPrice = Number(sqrtPriceX96) / Q96;
     const rawPrice = sqrtPrice * sqrtPrice; // sortedToken1 per sortedToken0 in raw terms
     const decimalAdjustment = Math.pow(10, (sortedToken0.decimals || 18) - (sortedToken1.decimals || 18));
     return rawPrice * decimalAdjustment; // sortedToken1 per sortedToken0 in human terms
@@ -1192,6 +1193,7 @@ export function V3PoolsTab() {
   const [selectedPool, setSelectedPool] = useState<PoolData | undefined>(undefined);
   const [selectedPosition, setSelectedPosition] = useState<any>(null);
   const [invertPositionPrices, setInvertPositionPrices] = useState(false);
+  const [analyticsPool, setAnalyticsPool] = useState<PoolData | null>(null);
 
   // Fetch real pool data from V3 contracts
   const { pools, stats, isLoading: poolsLoading } = useAllPools();
@@ -1238,6 +1240,19 @@ export function V3PoolsTab() {
   }, [positions, stats.totalTvlUsd]);
 
   const isLoading = poolsLoading || positionsLoading;
+
+  // Show analytics page if a pool is selected
+  if (analyticsPool) {
+    return (
+      <PoolAnalytics
+        poolAddress={analyticsPool.address}
+        token0Symbol={analyticsPool.token0Symbol}
+        token1Symbol={analyticsPool.token1Symbol}
+        fee={analyticsPool.fee}
+        onBack={() => setAnalyticsPool(null)}
+      />
+    );
+  }
 
   return (
     <div>
@@ -1489,6 +1504,16 @@ export function V3PoolsTab() {
                             Active
                           </span>
                         )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAnalyticsPool(pool);
+                          }}
+                          className="p-1.5 hover:bg-zinc-700 rounded-lg transition-colors group"
+                          title="View Pool Analytics"
+                        >
+                          <Info className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300" />
+                        </button>
                       </div>
                     </div>
 

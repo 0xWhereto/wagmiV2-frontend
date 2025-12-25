@@ -21,9 +21,9 @@ export const CHAIN_CONFIG = {
       nonfungiblePositionManager: "0x5826e10B513C891910032F15292B2F1b3041C3Df",
       quoterV2: "0x57e3e0a9DfB3DA34cc164B2C8dD1EBc404c45d47",
       // 0IL Protocol V3 - Clean deployment with full MIM (USDC backing + auto-LP)
-      mim: "0x9ea06883EE9aA5F93d68fb3E85C4Cf44f4C01073", // Full MIM with mintWithUSDC
-      stakingVault: "0x0C55BC6A970055Bde2FFF573338cDC396DE5eF22", // MIMStakingVaultV2
-      mimUsdcPool: "0x61B0f8EFc07C255681a09ed98d6b47Aa1a194D87", // MIM/sUSDC pool (0.01%)
+      mim: "0xf3DBF67010C7cAd25c152AB772F8Ef240Cc9c14f", // Full MIM with mintWithUSDC
+      stakingVault: "0x263ee9b0327E2A103F0D9808110a02c82E1A979d", // MIMStakingVaultV2
+      mimUsdcPool: "0x3Be1A1975D2bd22fDE3079f2eee7140Cb55BE556", // MIM/sUSDC pool (0.01%)
       swethMimPool: "0x1b287D79E341C52B2aeC78a3803042D222C8Ab24", // sWETH/MIM pool (0.01%)
       oracleAdapter: "0xA5725c6694DcDC1fba1BB26115c16DA633B41dbA", // SimpleOracle
       v3LPVault: "0x40a8af8516cC5557127e6601cC5c794EDB5F97C8", // V3LPVault
@@ -45,7 +45,7 @@ export const CHAIN_CONFIG = {
     explorer: "https://arbiscan.io",
     isHubChain: false,
     contracts: {
-      gatewayVault: "0x2d603F7B0d06Bd5f6232Afe1991aF3D103d68071", // NEW GATEWAY with rescue function
+      gatewayVault: "0x187ddD9a94236Ba6d22376eE2E3C4C834e92f34e", // OLD GATEWAY (no rescue, but works)
     },
     nativeCurrency: {
       name: "Ethereum",

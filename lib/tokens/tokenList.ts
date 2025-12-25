@@ -140,11 +140,11 @@ export const SONIC_TOKENS: Token[] = [
     coingeckoId: 'wrapped-bitcoin', // Use WBTC price
   }),
   // 0IL Protocol V3 - Clean deployment with full MIM
-  createToken(146, '0x9ea06883EE9aA5F93d68fb3E85C4Cf44f4C01073', 'MIM', 'Magic Internet Money', 18, { 
+  createToken(146, '0xf3DBF67010C7cAd25c152AB772F8Ef240Cc9c14f', 'MIM', 'Magic Internet Money', 18, { 
     tags: ['stablecoin', '0IL'],
     coingeckoId: 'usd-coin', // Track 1:1 with USD
   }),
-  createToken(146, '0x0C55BC6A970055Bde2FFF573338cDC396DE5eF22', 'sMIM', 'Staked MIM', 18, {
+  createToken(146, '0x263ee9b0327E2A103F0D9808110a02c82E1A979d', 'sMIM', 'Staked MIM', 18, {
     tags: ['stablecoin', '0IL', 'staked'],
     coingeckoId: 'usd-coin', // Track 1:1 with USD
   }),

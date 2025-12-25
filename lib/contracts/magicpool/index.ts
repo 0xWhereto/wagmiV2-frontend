@@ -2,20 +2,27 @@
 // Updated to v4 deployment
 
 export const MAGICPOOL_ADDRESSES = {
-  // Core 0IL Contracts V3 - Clean deployment with full MIM
-  mimToken: "0x9ea06883EE9aA5F93d68fb3E85C4Cf44f4C01073" as `0x${string}`, // Full MIM with mintWithUSDC
-  stakingVault: "0x0C55BC6A970055Bde2FFF573338cDC396DE5eF22" as `0x${string}`, // MIMStakingVaultV2
-  mimUsdcPool: "0x61B0f8EFc07C255681a09ed98d6b47Aa1a194D87" as `0x${string}`, // MIM/sUSDC pool
+  // Core 0IL Contracts V4 - Fixed MIM with correct tick range
+  mimToken: "0xf3DBF67010C7cAd25c152AB772F8Ef240Cc9c14f" as `0x${string}`, // Fixed MIM with mintWithUSDC + correct LP
+  stakingVault: "0x263ee9b0327E2A103F0D9808110a02c82E1A979d" as `0x${string}`, // MIMStakingVaultV2 (NEW)
+  mimUsdcPool: "0x3Be1A1975D2bd22fDE3079f2eee7140Cb55BE556" as `0x${string}`, // NEW MIM/sUSDC pool
   swethMimPool: "0x1b287D79E341C52B2aeC78a3803042D222C8Ab24" as `0x${string}`, // sWETH/MIM pool
-  oracleAdapter: "0xA5725c6694DcDC1fba1BB26115c16DA633B41dbA" as `0x${string}`, // SimpleOracle
-  v3LPVault: "0x40a8af8516cC5557127e6601cC5c794EDB5F97C8" as `0x${string}`, // V3LPVault
-  leverageAMM: "0x1f0447A083fDD5099a310F1e1897F9Fb1043c875" as `0x${string}`, // LeverageAMMV2
+  oracleAdapter: "0xA5725c6694DcDC1fba1BB26115c16DA633B41dbA" as `0x${string}`, // SimpleOracle (sWETH)
+  v3LPVault: "0x40a8af8516cC5557127e6601cC5c794EDB5F97C8" as `0x${string}`, // V3LPVault (sWETH/MIM)
+  leverageAMM: "0x1f0447A083fDD5099a310F1e1897F9Fb1043c875" as `0x${string}`, // LeverageAMMV2 (sWETH)
   wETH: "0x6dbB555EaD5D236e912fCFe28cec0C737E9E1D04" as `0x${string}`, // Zero-IL wETH
+  
+  // sWBTC Zero-IL Vault Infrastructure (FIXED - correct price)
+  sWBTCMIMPool: "0xeCeBFb34875DA11ea6512BDa2b016EcEdb971Fb5" as `0x${string}`, // sWBTC/MIM pool (0.05% fee)
+  wBTCOracle: "0x86cD993209e58A9Db915BC5aD182E185a616aa17" as `0x${string}`, // SimpleOracle (sWBTC)
+  wBTCV3Vault: "0xF1AbAB357Dcfaf873bBCC0C0620B8BeA2C999908" as `0x${string}`, // V3LPVault (sWBTC/MIM)
+  wBTCLeverageAMM: "0xF7CFeb7638B962eBD8816B50AE979a774a61f154" as `0x${string}`, // LeverageAMMV2 (sWBTC)
+  wBTC: "0x40D9bc9e3dd25b89924fD6f263D543DF840bf852" as `0x${string}`, // Zero-IL wBTC
   
   // Underlying synthetic tokens
   sUSDC: "0xa56a2C5678f8e10F61c6fBafCB0887571B9B432B" as `0x${string}`, // Synthetic sUSDC from Hub
   sWETH: "0x5E501C482952c1F2D58a4294F9A97759968c5125" as `0x${string}`,
-  sWBTC: "0x20Ca9a180b6ae1f0Ba5B6750F47b1061C49E8aFE" as `0x${string}`,
+  sWBTC: "0x2F0324268031E6413280F3B5ddBc4A97639A284a" as `0x${string}`, // Fixed address (uppercase F)
 } as const;
 
 // MIM Token ABI (core functions)

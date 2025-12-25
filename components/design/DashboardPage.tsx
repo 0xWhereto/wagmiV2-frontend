@@ -59,7 +59,7 @@ export function DashboardPage() {
   
   // Real Zero IL vault data
   const { wethVault, wbtcVault } = useAllZeroILVaults();
-  const { balance: sMIMBalance, totalAssets: sMIMTotalAssets } = useMIMStaking();
+  const { userSMIMBalance: sMIMBalance, totalAssets: sMIMTotalAssets } = useMIMStaking();
   
   // Real V3 positions
   const { positions: v3Positions, isLoading: v3Loading } = useLiquidity();

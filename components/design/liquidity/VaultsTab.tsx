@@ -83,12 +83,13 @@ export function VaultsTab() {
       leverage: '2x',
       decimals: 18,
       vault: wethVault,
+      isActive: true, // Vault is deployed and functional
     },
     {
       id: 'sWBTC' as const,
       name: 'sWBTC Vault',
       asset: 'sWBTC',
-      wToken: 'wsWBTC',
+      wToken: 'wBTC',
       icon: '₿',
       iconBg: 'from-orange-400 to-orange-600',
       description: 'Zero IL sWBTC exposure with 2x leveraged LP',
@@ -102,6 +103,7 @@ export function VaultsTab() {
       leverage: '2x',
       decimals: 8,
       vault: wbtcVault,
+      isActive: true, // Vault now deployed and functional!
     },
   ];
 
@@ -111,19 +113,20 @@ export function VaultsTab() {
     return vaults.find(v => v.id === selectedVault);
   };
 
-  // Calculate total TVL
-  const totalTVL = vaults.reduce((sum, v) => {
+  // Calculate total TVL (only from active vaults)
+  const activeVaults = vaults.filter(v => v.isActive);
+  const totalTVL = activeVaults.reduce((sum, v) => {
     const tvl = parseFloat(v.vault.totalDeposited) * v.vault.assetPrice;
     return sum + (isNaN(tvl) ? 0 : tvl);
   }, 0);
 
-  // Calculate average APR
-  const avgAPR = vaults.length > 0 
-    ? vaults.reduce((sum, v) => sum + v.vault.apr, 0) / vaults.length 
+  // Calculate average APR (only from active vaults)
+  const avgAPR = activeVaults.length > 0 
+    ? activeVaults.reduce((sum, v) => sum + v.vault.apr, 0) / activeVaults.length 
     : 0;
 
-  // Calculate user total deposits
-  const userTotalValue = vaults.reduce((sum, v) => {
+  // Calculate user total deposits (only from active vaults)
+  const userTotalValue = activeVaults.reduce((sum, v) => {
     const val = parseFloat(v.vault.wTokenBalance) * v.vault.assetPrice;
     return sum + (isNaN(val) ? 0 : val);
   }, 0);
@@ -306,16 +309,25 @@ export function VaultsTab() {
 
             {/* Action Buttons */}
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  setSelectedVault(vault.id);
-                  setActionMode('deposit');
-                }}
-                className="flex-1 py-3 bg-zinc-100 hover:bg-white text-zinc-950 rounded-lg transition-all font-medium"
-              >
-                Deposit {vault.asset}
-              </button>
-              {isConnected && parseFloat(vault.userDeposit) > 0 && (
+              {vault.isActive ? (
+                <button
+                  onClick={() => {
+                    setSelectedVault(vault.id);
+                    setActionMode('deposit');
+                  }}
+                  className="flex-1 py-3 bg-zinc-100 hover:bg-white text-zinc-950 rounded-lg transition-all font-medium"
+                >
+                  Deposit {vault.asset}
+                </button>
+              ) : (
+                <button
+                  disabled
+                  className="flex-1 py-3 bg-zinc-800 text-zinc-500 rounded-lg cursor-not-allowed font-medium"
+                >
+                  Coming Soon
+                </button>
+              )}
+              {isConnected && vault.isActive && parseFloat(vault.userDeposit) > 0 && (
                 <button
                   onClick={() => {
                     setSelectedVault(vault.id);

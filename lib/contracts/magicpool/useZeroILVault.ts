@@ -25,17 +25,22 @@ type VaultType = "sWETH" | "sWBTC";
 
 /**
  * Hook for Zero-IL vault interactions
- * Note: In the new 0IL system, we currently only have sWETH vault deployed
- * sWBTC vault would follow the same pattern when deployed
+ * Both sWETH and sWBTC vaults are now deployed
  */
 export function useZeroILVault(vaultType: VaultType) {
   const { address } = useAccount();
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
 
-  // Currently only wETH vault is deployed
-  // For sWBTC, we'd need to deploy a separate LeverageAMM + WToken
-  const vaultAddress = MAGICPOOL_ADDRESSES.wETH; // wETH Zero-IL token
-  const assetAddress = MAGICPOOL_ADDRESSES.sWETH;
+  // Select vault addresses based on type
+  const vaultAddress = vaultType === "sWETH" 
+    ? MAGICPOOL_ADDRESSES.wETH 
+    : MAGICPOOL_ADDRESSES.wBTC;
+  const assetAddress = vaultType === "sWETH" 
+    ? MAGICPOOL_ADDRESSES.sWETH 
+    : MAGICPOOL_ADDRESSES.sWBTC;
+  const oracleAddress = vaultType === "sWETH"
+    ? MAGICPOOL_ADDRESSES.oracleAdapter
+    : MAGICPOOL_ADDRESSES.wBTCOracle;
   const decimals = vaultType === "sWETH" ? 18 : 8;
 
   // Get wToken balance (vault shares)
@@ -92,17 +97,26 @@ export function useZeroILVault(vaultType: VaultType) {
     query: { enabled: !!address },
   });
 
-  // Get asset price from oracle (MIM per sWETH)
+  // Get asset price from oracle (MIM per asset)
   // Since MIM is 1:1 with USDC, this gives USD price
   const { data: oraclePrice } = useReadContract({
-    address: MAGICPOOL_ADDRESSES.oracleAdapter,
+    address: oracleAddress,
     abi: ORACLE_ABI,
     functionName: "getPrice",
     chainId: HUB_CHAIN_ID,
   });
 
-  // sWETH price in USD (oracle returns MIM per sWETH ≈ USD per sWETH)
-  const assetPriceUSD = oraclePrice ? parseFloat(formatUnits(oraclePrice, 18)) : 3000;
+  // Asset price in USD (oracle returns raw Uniswap price with 18 decimal precision)
+  // Need to adjust for decimal difference between asset and MIM:
+  // - sWETH (18 decimals) vs MIM (18 decimals): divide by 1e18 → price is direct
+  // - sWBTC (8 decimals) vs MIM (18 decimals): divide by 1e28 effectively (1e18 + 1e10 adjustment)
+  const defaultPrice = vaultType === "sWETH" ? 3000 : 95000;
+  let assetPriceUSD = defaultPrice;
+  if (oraclePrice) {
+    const rawPrice = parseFloat(formatUnits(oraclePrice, 18));
+    // For sWBTC, the raw price needs to be divided by 1e10 due to decimal difference (18 - 8 = 10)
+    assetPriceUSD = vaultType === "sWBTC" ? rawPrice / 1e10 : rawPrice;
+  }
 
   // Approve asset for vault
   const approveAsset = async (amount: bigint) => {
@@ -188,18 +202,17 @@ export function useZeroILVault(vaultType: VaultType) {
   };
 }
 
-// Hook to get wETH vault (sWBTC vault not yet deployed)
+// Hook to get both wETH and wBTC vaults
 export function useAllZeroILVaults() {
   const wethVault = useZeroILVault("sWETH");
-  // sWBTC vault would be added here when deployed
-  const wbtcVault = useZeroILVault("sWETH"); // Placeholder - using sWETH vault for now
+  const wbtcVault = useZeroILVault("sWBTC");
 
   return {
     wethVault,
     wbtcVault,
     refetchAll: () => {
       wethVault.refetch();
-      // wbtcVault.refetch(); // Would be called when deployed
+      wbtcVault.refetch();
     },
   };
 }
