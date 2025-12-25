@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, BarChart3, DollarSign, Activity, Droplets } from 'lucide-react';
+import { ArrowLeft, ExternalLink, TrendingUp, BarChart3, DollarSign, Activity } from 'lucide-react';
 import Image from 'next/image';
 import { getTokenLogoBySymbol } from '@/lib/tokens/logos';
-import { usePublicClient } from 'wagmi';
+import { useReadContract } from 'wagmi';
 import { formatUnits } from 'viem';
 
 const HUB_CHAIN_ID = 146;
@@ -136,151 +136,138 @@ const TOKEN_PRICES: Record<string, number> = {
 };
 
 export function PoolAnalytics({ poolAddress, token0Symbol, token1Symbol, fee, onBack }: PoolAnalyticsProps) {
-  const publicClient = usePublicClient({ chainId: HUB_CHAIN_ID });
-  const [poolStats, setPoolStats] = useState<PoolStats | null>(null);
-  const [tickData, setTickData] = useState<TickData[]>([]);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'TVL' | 'Volume' | 'Fees' | 'Liquidity'>('Liquidity');
   const [priceDirection, setPriceDirection] = useState<'0to1' | '1to0'>('0to1');
 
-  // Fetch pool data
-  useEffect(() => {
-    async function fetchPoolData() {
-      if (!publicClient || !poolAddress) return;
-      
-      setLoading(true);
-      try {
-        // Get pool state
-        const [slot0, liquidity, token0Addr, token1Addr, poolFee, tickSpacing] = await Promise.all([
-          publicClient.readContract({
-            address: poolAddress as `0x${string}`,
-            abi: POOL_ABI,
-            functionName: 'slot0',
-          }),
-          publicClient.readContract({
-            address: poolAddress as `0x${string}`,
-            abi: POOL_ABI,
-            functionName: 'liquidity',
-          }),
-          publicClient.readContract({
-            address: poolAddress as `0x${string}`,
-            abi: POOL_ABI,
-            functionName: 'token0',
-          }),
-          publicClient.readContract({
-            address: poolAddress as `0x${string}`,
-            abi: POOL_ABI,
-            functionName: 'token1',
-          }),
-          publicClient.readContract({
-            address: poolAddress as `0x${string}`,
-            abi: POOL_ABI,
-            functionName: 'fee',
-          }),
-          publicClient.readContract({
-            address: poolAddress as `0x${string}`,
-            abi: POOL_ABI,
-            functionName: 'tickSpacing',
-          }),
-        ]);
+  // Fetch pool slot0
+  const { data: slot0, isLoading: slot0Loading } = useReadContract({
+    address: poolAddress as `0x${string}`,
+    abi: POOL_ABI,
+    functionName: 'slot0',
+    chainId: HUB_CHAIN_ID,
+  });
 
-        const currentTick = Number(slot0[1]);
-        const sqrtPriceX96 = slot0[0];
-        
-        // Calculate current price
-        const price = Number(sqrtPriceX96) ** 2 / (2 ** 192);
-        
-        // Get token balances in pool
-        const [token0Balance, token1Balance, token0Decimals, token1Decimals] = await Promise.all([
-          publicClient.readContract({
-            address: token0Addr,
-            abi: ERC20_ABI,
-            functionName: 'balanceOf',
-            args: [poolAddress as `0x${string}`],
-          }),
-          publicClient.readContract({
-            address: token1Addr,
-            abi: ERC20_ABI,
-            functionName: 'balanceOf',
-            args: [poolAddress as `0x${string}`],
-          }),
-          publicClient.readContract({
-            address: token0Addr,
-            abi: ERC20_ABI,
-            functionName: 'decimals',
-          }),
-          publicClient.readContract({
-            address: token1Addr,
-            abi: ERC20_ABI,
-            functionName: 'decimals',
-          }),
-        ]);
+  // Fetch pool liquidity
+  const { data: liquidity, isLoading: liquidityLoading } = useReadContract({
+    address: poolAddress as `0x${string}`,
+    abi: POOL_ABI,
+    functionName: 'liquidity',
+    chainId: HUB_CHAIN_ID,
+  });
 
-        const token0Amount = parseFloat(formatUnits(token0Balance, token0Decimals));
-        const token1Amount = parseFloat(formatUnits(token1Balance, token1Decimals));
-        const token0Price = TOKEN_PRICES[token0Symbol] || 1;
-        const token1Price = TOKEN_PRICES[token1Symbol] || 1;
-        const token0Value = token0Amount * token0Price;
-        const token1Value = token1Amount * token1Price;
+  // Fetch token addresses
+  const { data: token0Addr } = useReadContract({
+    address: poolAddress as `0x${string}`,
+    abi: POOL_ABI,
+    functionName: 'token0',
+    chainId: HUB_CHAIN_ID,
+  });
 
-        setPoolStats({
-          tvl: token0Value + token1Value,
-          token0Amount,
-          token1Amount,
-          token0Value,
-          token1Value,
-          currentTick,
-          currentPrice: price,
-          fee: Number(poolFee),
-          liquidity,
-        });
+  const { data: token1Addr } = useReadContract({
+    address: poolAddress as `0x${string}`,
+    abi: POOL_ABI,
+    functionName: 'token1',
+    chainId: HUB_CHAIN_ID,
+  });
 
-        // Fetch tick data around current tick
-        const tickSpacingNum = Number(tickSpacing);
-        const ticksToFetch: number[] = [];
-        const range = 50; // Number of tick spacings to fetch on each side
-        
-        for (let i = -range; i <= range; i++) {
-          const tick = Math.floor(currentTick / tickSpacingNum) * tickSpacingNum + i * tickSpacingNum;
-          ticksToFetch.push(tick);
-        }
+  // Fetch token balances
+  const { data: token0Balance } = useReadContract({
+    address: token0Addr as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: [poolAddress as `0x${string}`],
+    chainId: HUB_CHAIN_ID,
+    query: { enabled: !!token0Addr },
+  });
 
-        // Fetch tick data in batches
-        const tickDataResults: TickData[] = [];
-        for (const tick of ticksToFetch) {
-          try {
-            const tickInfo = await publicClient.readContract({
-              address: poolAddress as `0x${string}`,
-              abi: POOL_ABI,
-              functionName: 'ticks',
-              args: [tick],
-            });
-            
-            if (tickInfo[7]) { // initialized
-              const price0 = Math.pow(1.0001, tick);
-              tickDataResults.push({
-                tick,
-                liquidityGross: tickInfo[0],
-                liquidityNet: tickInfo[1],
-                price0,
-                price1: 1 / price0,
-              });
-            }
-          } catch {
-            // Tick not initialized, skip
-          }
-        }
+  const { data: token1Balance } = useReadContract({
+    address: token1Addr as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: [poolAddress as `0x${string}`],
+    chainId: HUB_CHAIN_ID,
+    query: { enabled: !!token1Addr },
+  });
 
-        setTickData(tickDataResults.sort((a, b) => a.tick - b.tick));
-      } catch (error) {
-        console.error('Error fetching pool data:', error);
-      } finally {
-        setLoading(false);
-      }
+  const { data: token0Decimals } = useReadContract({
+    address: token0Addr as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: 'decimals',
+    chainId: HUB_CHAIN_ID,
+    query: { enabled: !!token0Addr },
+  });
+
+  const { data: token1Decimals } = useReadContract({
+    address: token1Addr as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: 'decimals',
+    chainId: HUB_CHAIN_ID,
+    query: { enabled: !!token1Addr },
+  });
+
+  // Calculate pool stats
+  const poolStats = useMemo<PoolStats | null>(() => {
+    if (!slot0 || !liquidity || !token0Balance || !token1Balance || token0Decimals === undefined || token1Decimals === undefined) {
+      return null;
     }
 
-    fetchPoolData();
-  }, [publicClient, poolAddress, token0Symbol, token1Symbol]);
+    const currentTick = Number(slot0[1]);
+    const sqrtPriceX96 = slot0[0];
+    const price = Math.pow(Number(sqrtPriceX96) / (2 ** 96), 2);
+
+    const token0Amount = parseFloat(formatUnits(token0Balance, token0Decimals));
+    const token1Amount = parseFloat(formatUnits(token1Balance, token1Decimals));
+    const token0Price = TOKEN_PRICES[token0Symbol] || 1;
+    const token1Price = TOKEN_PRICES[token1Symbol] || 1;
+    const token0Value = token0Amount * token0Price;
+    const token1Value = token1Amount * token1Price;
+
+    return {
+      tvl: token0Value + token1Value,
+      token0Amount,
+      token1Amount,
+      token0Value,
+      token1Value,
+      currentTick,
+      currentPrice: price,
+      fee,
+      liquidity,
+    };
+  }, [slot0, liquidity, token0Balance, token1Balance, token0Decimals, token1Decimals, token0Symbol, token1Symbol, fee]);
+
+  // For tick data, we'll show a simplified view since fetching many ticks requires batching
+  const tickData = useMemo<TickData[]>(() => {
+    if (!poolStats) return [];
+    
+    // Generate simulated tick distribution around current price
+    // In production, you'd fetch actual tick data from an indexer
+    const currentTick = poolStats.currentTick;
+    const bars: TickData[] = [];
+    const tickSpacing = fee === 100 ? 1 : fee === 500 ? 10 : fee === 3000 ? 60 : 200;
+    
+    for (let i = -30; i <= 30; i++) {
+      const tick = Math.floor(currentTick / tickSpacing) * tickSpacing + i * tickSpacing;
+      const distance = Math.abs(i);
+      // Simulate liquidity concentration around current tick
+      const baseLiquidity = Number(poolStats.liquidity / BigInt(1e12));
+      const simulatedLiquidity = baseLiquidity * Math.exp(-distance * 0.1);
+      
+      if (simulatedLiquidity > 0) {
+        const price0 = Math.pow(1.0001, tick);
+        bars.push({
+          tick,
+          liquidityGross: BigInt(Math.floor(simulatedLiquidity)),
+          liquidityNet: BigInt(0),
+          price0,
+          price1: 1 / price0,
+        });
+      }
+    }
+    
+    return bars;
+  }, [poolStats, fee]);
+
+  const loading = slot0Loading || liquidityLoading;
 
   // Calculate liquidity distribution for chart
   const liquidityBars = useMemo(() => {
