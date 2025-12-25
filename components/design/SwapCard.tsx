@@ -29,6 +29,7 @@ const AVAILABLE_CHAINS = [
 const TOKEN_PRICES: Record<string, number> = {
   ETH: 3370, WETH: 3370, USDC: 1, USDT: 1, DAI: 1, WBTC: 95000,
   S: 0.5, WAGMI: 0.85, sWETH: 3370, sUSDC: 1, sUSDT: 1, sDAI: 1,
+  MIM: 1, sMIM: 1, sWBTC: 95000,
 };
 
 const getTokenPrice = (symbol: string) => TOKEN_PRICES[symbol] || 0;

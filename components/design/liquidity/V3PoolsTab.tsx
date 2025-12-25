@@ -1446,13 +1446,30 @@ export function V3PoolsTab() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-4">
                       <div className="text-right">
                         <div className="text-xs text-zinc-500 mb-1">Value</div>
                         <div className="text-lg text-zinc-100 font-medium">
                           ${estimatedValue > 0.01 ? estimatedValue.toFixed(2) : '<0.01'}
                         </div>
                       </div>
+                      <button
+                        onClick={() => {
+                          // Find the pool for this position to open analytics
+                          const poolForPosition = pools.find(p => 
+                            p.token0Address.toLowerCase() === (pos.token0 || '').toLowerCase() &&
+                            p.token1Address.toLowerCase() === (pos.token1 || '').toLowerCase() &&
+                            p.fee === pos.fee
+                          );
+                          if (poolForPosition) {
+                            setAnalyticsPool(poolForPosition);
+                          }
+                        }}
+                        className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-all"
+                        title="Pool Analytics"
+                      >
+                        <Info className="w-5 h-5" />
+                      </button>
                       <button
                         onClick={() => {
                           setSelectedPosition(pos);

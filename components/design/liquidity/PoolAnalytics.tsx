@@ -213,7 +213,11 @@ export function PoolAnalytics({ poolAddress, token0Symbol, token1Symbol, fee, on
 
     const currentTick = Number(slot0[1]);
     const sqrtPriceX96 = slot0[0];
-    const price = Math.pow(Number(sqrtPriceX96) / (2 ** 96), 2);
+    // Raw price from sqrtPriceX96: token1 per token0
+    const rawPrice = Math.pow(Number(sqrtPriceX96) / (2 ** 96), 2);
+    // Adjust for decimal difference: multiply by 10^(token0Decimals - token1Decimals)
+    const decimalAdjustment = Math.pow(10, Number(token0Decimals) - Number(token1Decimals));
+    const price = rawPrice * decimalAdjustment;
 
     const token0Amount = parseFloat(formatUnits(token0Balance, token0Decimals));
     const token1Amount = parseFloat(formatUnits(token1Balance, token1Decimals));
@@ -267,7 +271,7 @@ export function PoolAnalytics({ poolAddress, token0Symbol, token1Symbol, fee, on
     return bars;
   }, [poolStats, fee]);
 
-  const loading = slot0Loading || liquidityLoading;
+  const loading = slot0Loading || liquidityLoading || !poolStats;
 
   // Calculate liquidity distribution for chart
   const liquidityBars = useMemo(() => {
@@ -312,18 +316,28 @@ export function PoolAnalytics({ poolAddress, token0Symbol, token1Symbol, fee, on
 
   const currentPrice = useMemo(() => {
     if (!poolStats) return 0;
-    // Adjust for decimals
-    const token0Decimals = token0Symbol === 'sWBTC' ? 8 : 18;
-    const token1Decimals = token1Symbol === 'sWBTC' ? 8 : 18;
-    const decimalAdjustment = Math.pow(10, token1Decimals - token0Decimals);
-    const rawPrice = poolStats.currentPrice * decimalAdjustment;
-    return priceDirection === '0to1' ? rawPrice : 1 / rawPrice;
-  }, [poolStats, priceDirection, token0Symbol, token1Symbol]);
+    // poolStats.currentPrice is already decimal-adjusted (token1 per token0)
+    // priceDirection '0to1' means show token1 per token0, '1to0' means token0 per token1
+    return priceDirection === '0to1' ? poolStats.currentPrice : 1 / poolStats.currentPrice;
+  }, [poolStats, priceDirection]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin w-8 h-8 border-2 border-zinc-500 border-t-zinc-200 rounded-full" />
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-zinc-400" />
+          </button>
+          <h1 className="text-xl font-semibold text-white">
+            {token0Symbol}/{token1Symbol}
+          </h1>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin w-8 h-8 border-2 border-zinc-500 border-t-zinc-200 rounded-full" />
+        </div>
       </div>
     );
   }
